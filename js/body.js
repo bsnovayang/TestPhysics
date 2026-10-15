@@ -25,6 +25,8 @@ export class Body {
     this.vx = 0;
     this.vy = 0;
     this.mass = 1;
+    this.density = 1;   // 相對於水：小於 1 會浮起來，大於 1 會下沉
+    this.submerged = 0; // 泡在水裡的比例
     this.alive = true;
     this.solid = false;
     this.isBody = true;
@@ -57,6 +59,26 @@ export class Body {
     this.vx += this.mods.gx * ldt;
     this.vy += this.mods.gy * ldt;
     this.applyDrag(ldt);
+  }
+
+  // 浮力與水中阻力。浮力方向和當下的重力相反，大小 = 重力 × 泡水比例 ÷ 密度
+  applyWater(world, ldt) {
+    this.submerged = world.water ? world.water.submersion(this) : 0;
+    if (this.submerged <= 0) return;
+    const k = this.submerged / this.density;
+    this.vx -= this.mods.gx * k * ldt;
+    this.vy -= this.mods.gy * k * ldt;
+    const drag = Math.exp(-cfg.waterDrag * this.submerged * ldt);
+    this.vx *= drag;
+    this.vy *= drag;
+  }
+
+  // 是否站在冰上（冰牆格或冰塊）
+  onIce(world) {
+    if (!this.grounded || this.groundAxis !== 'y') return false;
+    if (this.groundBody?.isIce) return true;
+    const fy = this.groundSign > 0 ? this.y + this.h + 1 : this.y - 1;
+    return world.map.get(Math.floor(this.cx / 16), Math.floor(fy / 16)) === 'I';
   }
 
   // 只削減「逆著場域重力」的速度：順著重力衝出去不受影響（電梯保有衝力），

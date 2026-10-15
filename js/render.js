@@ -65,6 +65,7 @@ export class Renderer {
     this.drawGrid();
     this.drawFieldFills(world);
     this.drawTiles(world);
+    this.drawWater(world);
     this.drawPortals(world);
     this.drawSwitchesAndDoors(world);
     this.drawJammerRanges(world);
@@ -105,6 +106,15 @@ export class Renderer {
             ctx.fillStyle = C.tileTop;
             ctx.fillRect(x, y, TILE, 3);
           }
+        } else if (c === 'I') {
+          // 冰牆格：被光照時越來越紅、越亮
+          const heat = Math.min(1, world.water.meltProgress(tx, ty));
+          ctx.fillStyle = heat > 0 ? `rgb(${Math.round(190 + heat * 65)},${Math.round(232 - heat * 60)},255)` : '#bfe8ff';
+          ctx.fillRect(x, y, TILE, TILE);
+          ctx.fillStyle = 'rgba(255,255,255,0.6)';
+          ctx.fillRect(x + 2, y + 2, 5, 2);
+          ctx.strokeStyle = '#8cc8e8';
+          ctx.strokeRect(x + 0.5, y + 0.5, TILE - 1, TILE - 1);
         } else if (c === '^') {
           this.drawSpike(x, y, map.isSolid(tx, ty - 1) && !map.isSolid(tx, ty + 1));
         } else if (c === '|' && cfg.showHitboxes) {
@@ -117,6 +127,33 @@ export class Renderer {
     ctx.fillStyle = C.tile;
     for (let tx = 0; tx < COLS; tx++) {
       if (map.get(tx, ROWS - 1) === '#') ctx.fillRect(tx * TILE, ROWS * TILE, TILE, VIEW_H - ROWS * TILE);
+    }
+  }
+
+  // 水：從格子底部往上填；上方也有水時整格填滿。被時停的水畫成淡青色並加框
+  drawWater(world) {
+    const ctx = this.ctx;
+    const w = world.water;
+    for (let ty = 0; ty < ROWS; ty++) {
+      for (let tx = 0; tx < COLS; tx++) {
+        const a = w.get(tx, ty);
+        if (a <= 0.01) continue;
+        const full = a >= 0.99 || w.get(tx, ty - 1) > 0.01;
+        const h = full ? TILE : Math.max(1, a * TILE);
+        const x = tx * TILE;
+        const y = ty * TILE + TILE - h;
+        const frozen = w.frozen.has(w.idx(tx, ty));
+        ctx.fillStyle = frozen ? 'rgba(150,220,255,0.7)' : 'rgba(60,140,255,0.45)';
+        ctx.fillRect(x, y, TILE, h);
+        if (!full || w.get(tx, ty - 1) <= 0.01) {
+          ctx.fillStyle = frozen ? '#e0f6ff' : 'rgba(170,215,255,0.8)';
+          ctx.fillRect(x, y, TILE, 1);
+        }
+        if (frozen) {
+          ctx.strokeStyle = 'rgba(200,240,255,0.8)';
+          ctx.strokeRect(x + 0.5, y + 0.5, TILE - 1, h - 1);
+        }
+      }
     }
   }
 
@@ -334,6 +371,37 @@ export class Renderer {
 
   drawEntity(world, e) {
     const ctx = this.ctx;
+    if (e.isCooler) {
+      // 冷凍裝置：雪花＋範圍
+      ctx.strokeStyle = 'rgba(200,240,255,0.35)';
+      ctx.setLineDash([2, 4]);
+      ctx.beginPath();
+      ctx.arc(e.cx, e.cy, cfg.coldRadius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#2a2f3c';
+      ctx.fillRect(e.x, e.y, e.w, e.h);
+      ctx.strokeStyle = '#e0f6ff';
+      ctx.beginPath();
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI + world.time * 0.5;
+        ctx.moveTo(e.cx - Math.cos(a) * 5, e.cy - Math.sin(a) * 5);
+        ctx.lineTo(e.cx + Math.cos(a) * 5, e.cy + Math.sin(a) * 5);
+      }
+      ctx.stroke();
+      return;
+    }
+    if (e.isIce) {
+      const heat = Math.min(1, e.heat / cfg.meltTime);
+      ctx.fillStyle = heat > 0 ? `rgba(${Math.round(200 + heat * 55)},${Math.round(235 - heat * 60)},255,0.9)` : 'rgba(200,235,255,0.85)';
+      ctx.fillRect(e.x, e.y, e.w, e.h);
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.fillRect(e.x + 2, e.y + 2, 6, 2);
+      ctx.strokeStyle = '#8cc8e8';
+      ctx.strokeRect(e.x + 0.5, e.y + 0.5, e.w - 1, e.h - 1);
+      this.timeTint(e);
+      return;
+    }
     if (e.isJammer) {
       const color = JAMMER_COLORS[e.kind];
       ctx.fillStyle = '#2a2f3c';

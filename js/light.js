@@ -1,7 +1,7 @@
-import { cfg, TILE } from './config.js';
+import { cfg, TILE, STEP, COLS, ROWS } from './config.js';
 import { Box } from './objects.js';
 
-const STEP = 2;
+const RAY_STEP = 2;
 const MAX_LENGTH = 1600;
 const DIRS = [
   { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 },
@@ -16,10 +16,13 @@ function normalize(v) {
   return { x: v.x / d, y: v.y / d };
 }
 
-// 折射率：時間越慢，光越慢，折射率越高。時停中的光會停住（回傳 Infinity）
+const WATER_INDEX = 1.33;
+
+// 折射率：時間越慢，光越慢，折射率越高；在水中再乘上水的折射率。時停中的光會停住（回傳 Infinity）
 function refractiveIndex(world, x, y) {
   const t = world.fields.sample(x, y).time;
-  return t < 0.05 ? Infinity : 1 / t;
+  if (t < 0.05) return Infinity;
+  return (1 / t) * (world.water.pointInWater(x, y) ? WATER_INDEX : 1);
 }
 
 // 追蹤一道光線，回傳折線（穿過傳送門時會斷開成多段）與最後擊中的東西。
@@ -35,9 +38,9 @@ export function traceBeam(world, x, y, dx, dy, source = null, hitsPlayer = true)
   let hit = { type: 'none' };
   let bendSteps = 0;
 
-  for (let len = 0; len < MAX_LENGTH; len += STEP) {
-    const nx = x + d.x * STEP;
-    const ny = y + d.y * STEP;
+  for (let len = 0; len < MAX_LENGTH; len += RAY_STEP) {
+    const nx = x + d.x * RAY_STEP;
+    const ny = y + d.y * RAY_STEP;
 
     const cross = world.portals.crossSegment(x, y, nx, ny);
     if (cross) {
@@ -50,9 +53,16 @@ export function traceBeam(world, x, y, dx, dy, source = null, hitsPlayer = true)
       continue;
     }
 
-    if (world.map.pointSolid(nx, ny)) {
+    if (nx < 0 || ny < 0 || nx >= COLS * TILE || ny >= ROWS * TILE) {
       cur.push({ x: nx, y: ny });
       hit = { type: 'wall' };
+      break;
+    }
+    if (world.map.pointSolid(nx, ny)) {
+      cur.push({ x: nx, y: ny });
+      const tx = Math.floor(nx / TILE);
+      const ty = Math.floor(ny / TILE);
+      hit = world.map.get(tx, ty) === 'I' ? { type: 'ice', tx, ty } : { type: 'wall' };
       break;
     }
 
@@ -72,6 +82,7 @@ export function traceBeam(world, x, y, dx, dy, source = null, hitsPlayer = true)
         break;
       }
       if (e.isEnemy) { hit = { type: 'enemy', entity: e }; stop = true; break; }
+      if (e.isIce) { hit = { type: 'ice', entity: e }; stop = true; break; }
       if (e.solid && !e.isBullet) { hit = { type: 'block', entity: e }; stop = true; break; }
     }
     if (reflected) continue;
@@ -98,9 +109,17 @@ export function traceBeam(world, x, y, dx, dy, source = null, hitsPlayer = true)
       break;
     }
     if (Math.abs(n2 - n1) > 1e-6) {
-      const f = world.fields.list.find((fl) => fl.skill.type === 'timeMult' && fl.contains(x, y) !== fl.contains(nx, ny));
-      if (f) {
-        let N = normalize({ x: nx - f.x, y: ny - f.y });
+      // 邊界的法線：水面是水平的（跨格時依跨越的方向），時間場域是圓形
+      let N = null;
+      if (world.water.pointInWater(x, y) !== world.water.pointInWater(nx, ny)) {
+        const sameRow = Math.floor(y / TILE) === Math.floor(ny / TILE);
+        const sameCol = Math.floor(x / TILE) === Math.floor(nx / TILE);
+        N = sameRow && !sameCol ? { x: 1, y: 0 } : { x: 0, y: 1 };
+      } else {
+        const f = world.fields.list.find((fl) => fl.skill.type === 'timeMult' && fl.contains(x, y) !== fl.contains(nx, ny));
+        if (f) N = normalize({ x: nx - f.x, y: ny - f.y });
+      }
+      if (N) {
         if (N.x * d.x + N.y * d.y > 0) N = { x: -N.x, y: -N.y };
         const eta = n1 / n2;
         const cosi = -(N.x * d.x + N.y * d.y);
@@ -118,7 +137,7 @@ export function traceBeam(world, x, y, dx, dy, source = null, hitsPlayer = true)
     // 重力場域：光線彎曲（重力透鏡）
     const b = world.fields.lightBend(nx, ny);
     if (b.x || b.y) {
-      d = normalize({ x: d.x + b.x * cfg.lightBend * STEP, y: d.y + b.y * cfg.lightBend * STEP });
+      d = normalize({ x: d.x + b.x * cfg.lightBend * RAY_STEP, y: d.y + b.y * cfg.lightBend * RAY_STEP });
       if (++bendSteps % 3 === 0) cur.push({ x: nx, y: ny });
     }
 
@@ -177,6 +196,11 @@ export class MirrorBox extends Box {
 // 光線擊中時的效果。damage 為 0 時無害（只用於點亮接收器）
 export function applyBeamHit(world, hit, damage, fromX) {
   if (hit.type === 'receiver') hit.entity.lit = true;
+  // 光照到冰會升溫，持續約 1 秒就融化（不管光有沒有傷害）
+  if (hit.type === 'ice') {
+    if (hit.entity) hit.entity.heatUp(world, STEP);
+    else world.water.heatTile(world, hit.tx, hit.ty, STEP);
+  }
   if (!damage) return;
   if (hit.type === 'player') world.hurtPlayer(damage, { fromX });
   if (hit.type === 'enemy' && hit.entity.laserCd <= 0) {

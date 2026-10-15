@@ -18,6 +18,8 @@ export class Player extends Body {
     this.airDashUsed = false;
     this.invT = 0;
     this.stunT = 0; // 受傷硬直：期間不接受移動輸入
+    this.density = 1.03; // 不游的話會在水中慢慢下沉（約 5 秒沉到 4 格深的池底）
+    this.swimCd = 0;
     this.hasteT = 0;
     this.cannonCd = 0;
     this.timeScale = 1;
@@ -67,6 +69,14 @@ export class Player extends Body {
     const dxMouse = world.mouse.x - this.cx;
     if (Math.abs(dxMouse) > 1) this.facing = Math.sign(dxMouse);
 
+    // 游泳：在水中可以一直按跳躍往上游（方向和當下的重力相反）
+    this.swimCd -= dt;
+    if (input.wasPressed('Space') && this.submerged > 0.3 && this.swimCd <= 0 && this.stunT <= 0 && this.groundAxis) {
+      if (this.groundAxis === 'y') this.vy = -this.groundSign * cfg.swimSpeed;
+      else this.vx = -this.groundSign * cfg.swimSpeed;
+      this.swimCd = cfg.swimCooldown;
+    }
+
     // 跳躍（起跳速度固定，以正常重力換算）
     if (input.wasPressed('Space')) this.bufferT = cfg.jumpBuffer;
     else this.bufferT -= ldt;
@@ -97,8 +107,9 @@ export class Player extends Body {
       this.vx = this.dashDir * cfg.dashSpeed;
       if (!this.grounded) this.vy = 0;
     } else {
-      if (this.stunT <= 0) this.applyControl(inX, inY, ldt);
+      if (this.stunT <= 0) this.applyControl(inX, inY, ldt, this.onIce(world) ? cfg.iceFriction : 1);
       this.applyGravity(ldt);
+      this.applyWater(world, ldt);
     }
 
     // 沿重力方向的終端速度
@@ -130,13 +141,14 @@ export class Player extends Body {
     this.checkHazards(world);
   }
 
-  applyControl(inX, inY, ldt) {
+  // grip：地面抓地力倍率（冰面上很低，會滑）
+  applyControl(inX, inY, ldt, grip = 1) {
     const axis = this.groundAxis;
     if (axis === 'y') {
-      const accel = this.grounded ? cfg.groundAccel : cfg.airAccel;
+      const accel = this.grounded ? cfg.groundAccel * grip : cfg.airAccel;
       this.vx = approach(this.vx, inX * cfg.runSpeed, accel * ldt);
     } else if (axis === 'x') {
-      const accel = this.grounded ? cfg.groundAccel : cfg.airAccel;
+      const accel = this.grounded ? cfg.groundAccel * grip : cfg.airAccel;
       this.vy = approach(this.vy, inY * cfg.runSpeed, accel * ldt);
     } else if (inX !== 0) {
       // 無重力：只有按方向鍵時才施力，不會自動減速，可以用空氣砲的後座力推進

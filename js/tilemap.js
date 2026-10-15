@@ -5,10 +5,16 @@ import { TILE, COLS, ROWS } from './config.js';
 //   ^  尖刺（不實心，碰到會受傷）
 //   D  門（關閉時實心）
 //   |  移動平台的折返標記（只對平台有效，其他物體可以穿過）
+//   I  冰牆格（實心、很滑；被光照到會融化，水遇冷會結成冰牆格）
 export class TileMap {
   constructor(rows) {
-    this.rows = rows;
+    // 存成字元陣列，讓冰可以在遊戲中出現或消失
+    this.rows = rows.map((r) => r.split(''));
     this.doorOpen = false;
+  }
+
+  set(tx, ty, c) {
+    if (tx >= 0 && tx < COLS && ty >= 0 && ty < ROWS) this.rows[ty][tx] = c;
   }
 
   get(tx, ty) {
@@ -19,7 +25,7 @@ export class TileMap {
 
   isSolid(tx, ty) {
     const c = this.get(tx, ty);
-    return c === '#' || (c === 'D' && !this.doorOpen);
+    return c === '#' || c === 'I' || (c === 'D' && !this.doorOpen);
   }
 
   pointSolid(x, y) {

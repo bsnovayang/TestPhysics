@@ -17,6 +17,7 @@ class Enemy extends Body {
     this.flashT = 0;
     this.impactCd = 0;          // 物體互撞後的短暫冷卻，避免重疊時每幀重複受傷
     this.laserCd = 0;           // 被雷射打到後的短暫冷卻
+    this.density = 1.3;         // 一般敵人會沉入水中
     this.time = 1;
   }
 
@@ -46,6 +47,7 @@ class Enemy extends Body {
 
   physics(world, ldt) {
     this.applyGravity(ldt);
+    this.applyWater(world, ldt);
     if (this.groundAxis === 'y') this.vy = Math.max(-cfg.maxFall, Math.min(cfg.maxFall, this.vy));
     this.clampVelocity();
     this.lastMove = this.moveByVelocity(world, ldt);
@@ -206,6 +208,7 @@ export class Heavy extends Walker {
     this.x = tx * TILE + (TILE - this.w) / 2;
     this.y = (ty + 1) * TILE - this.h;
     this.mass = 5;
+    this.density = 3;
     this.speed = 22;
     this.armored = true;
     this.impactImmune = true;

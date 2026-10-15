@@ -6,7 +6,8 @@ import { PortalSystem } from './portals.js';
 import { rectsOverlap, impactDamage } from './body.js';
 import { Player } from './player.js';
 import { Web } from './projectiles.js';
-import { Box, BoxSpawner, MovingPlatform, Blade, Crusher, Switch, FixedJammer, MovableJammer } from './objects.js';
+import { Box, BoxSpawner, MovingPlatform, Blade, Crusher, Switch, FixedJammer, MovableJammer, IceBlock, Cooler } from './objects.js';
+import { WaterSystem } from './water.js';
 import { Walker, Heavy, Jumper, Flyer, Turret, LaserEnemy } from './enemies.js';
 import { Emitter, MirrorBox } from './light.js';
 
@@ -14,7 +15,7 @@ import { Emitter, MirrorBox } from './light.js';
 const JAMMER_KINDS = ['gravity', 'time', 'space', 'all'];
 import { ROOMS } from './rooms.js';
 
-const KEEP_IN_MAP = new Set(['#', '^', 'D', '|']);
+const KEEP_IN_MAP = new Set(['#', '^', 'D', '|', 'I']);
 
 function parseRoom(def) {
   const rows = def.map.map((r) => r.padEnd(COLS, ' ').slice(0, COLS));
@@ -22,6 +23,7 @@ function parseRoom(def) {
   const grid = rows.map((r) => r.split(''));
   const entities = [];
   const switches = [];
+  const water = [];
   let spawn = { tx: 2, ty: ROWS - 2 };
 
   for (let ty = 0; ty < ROWS; ty++) {
@@ -34,6 +36,10 @@ function parseRoom(def) {
         case 'K': entities.push(new Box(tx, ty, true)); break;
         case '@': entities.push(new BoxSpawner(tx, ty)); break;
         case 'M': entities.push(new MirrorBox(tx, ty)); break;
+        case '~': water.push({ tx, ty }); break;
+        case '%': grid[ty][tx] = '^'; water.push({ tx, ty }); continue; // 泡在水裡的尖刺
+        case 'Y': entities.push(new IceBlock(tx, ty)); break;
+        case 'C': entities.push(new Cooler(tx, ty)); break;
         case 'X': entities.push(new Emitter(tx, ty)); break;
         case 'R': switches.push(new Switch(tx, ty, 'light')); break;
         case 'l': entities.push(new LaserEnemy(tx, ty)); break;
@@ -65,7 +71,7 @@ function parseRoom(def) {
       grid[ty][tx] = ' ';
     }
   }
-  return { rows: grid.map((r) => r.join('')), entities, switches, spawn };
+  return { rows: grid.map((r) => r.join('')), entities, switches, spawn, water };
 }
 
 export class World {
@@ -91,6 +97,8 @@ export class World {
     this.roomIndex = ((index % ROOMS.length) + ROOMS.length) % ROOMS.length;
     const parsed = parseRoom(this.room);
     this.map = new TileMap(parsed.rows);
+    this.water = new WaterSystem(this.map);
+    for (const c of parsed.water) this.water.add(c.tx, c.ty, 1);
     this.entities = parsed.entities;
     this.switches = parsed.switches;
     this.doorTiles = this.map.doorTiles();
@@ -141,6 +149,7 @@ export class World {
   rectBlocked(x, y, w, h, self) {
     if (this.solidTiles(x, y, w, h)) return 'tile';
     if (self?.restsOnSpikes && this.map.rectSpikes(x, y, w, h)) return 'tile';
+    if (this.water?.frozenOverlap(x, y, w, h, self)) return 'tile'; // 被時停的水是實心的
     for (const e of this.entities) {
       if (e === self || !e.solid || !e.alive) continue;
       if (x < e.x + e.w && x + w > e.x && y < e.y + e.h && y + h > e.y) return e;
@@ -353,6 +362,7 @@ export class World {
     this.beams = [];
     for (const s of this.switches) s.lit = false;
     this.fields.update(dt);
+    this.water.update(this, dt);
     this.portals.update(dt, this);
     this.player.update(this, dt);
     this.updateChannels(dt);

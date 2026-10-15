@@ -62,6 +62,15 @@ export const cfg = {
   laserFire: 0.3,
   laserCooldown: 1.5,
 
+  // 水與溫度
+  coldRadius: 40,            // 冷凍裝置的範圍
+  freezeTime: 1,             // 水在冷凍範圍內多久結冰
+  meltTime: 1,               // 冰被光照多久融化
+  waterDrag: 4,              // 水中的阻力
+  swimSpeed: 140,            // 在水中按跳躍時往上游的速度
+  swimCooldown: 0.25,
+  iceFriction: 0.12,         // 冰面上的抓地力（倍率）
+
   // 空氣砲
   cannonRate: 4,         // 每秒發數
   cannonSpeed: 420,

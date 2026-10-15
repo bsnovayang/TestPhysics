@@ -10,6 +10,7 @@ export class Box extends Body {
     this.pushable = true;
     this.hittable = true;
     this.restsOnSpikes = true; // 尖刺對箱子是實心的：箱子可以壓在尖刺上，把尖刺蓋住
+    this.density = 0.5;        // 木箱會浮在水上
     this.pushV = 0;
   }
 
@@ -18,9 +19,11 @@ export class Box extends Body {
     const ldt = dt * this.mods.time;
     if (ldt > 0) {
       this.applyGravity(ldt);
+      this.applyWater(world, ldt);
       const pushed = this.pushV && this.groundAxis !== 'x';
+      const slippery = this.isIce || this.onIce(world);
       if (pushed) this.vx = this.pushV;
-      else this.applyFriction(cfg.boxFriction * ldt);
+      else this.applyFriction(cfg.boxFriction * ldt * (slippery ? cfg.iceFriction : 1));
       this.clampVelocity();
       const { bx } = this.moveByVelocity(world, ldt);
       // 推動排在一起的箱子
@@ -173,6 +176,46 @@ export class FixedJammer {
   update() {}
 }
 
+// 冰塊：可以推、很滑、大部分沉在水下；被光照射約 1 秒後融化成水
+export class IceBlock extends Box {
+  constructor(tx, ty) {
+    super(tx, ty);
+    this.isIce = true;
+    this.density = 0.9;
+    this.heat = 0;
+  }
+
+  update(world, dt) {
+    super.update(world, dt);
+    this.heat = Math.max(0, this.heat - dt * 0.5);
+  }
+
+  heatUp(world, dt) {
+    this.heat += dt * 1.5; // 扣掉自然降溫後，淨速率約每秒 1
+    if (this.heat < cfg.meltTime) return;
+    this.alive = false;
+    world.water.add(Math.floor(this.cx / TILE), Math.floor(this.cy / TILE), 1);
+    world.burst(this.cx, this.cy, '#9fd8ff', 12);
+  }
+}
+
+// 冷凍裝置：範圍內的水會結成冰牆格
+export class Cooler {
+  constructor(tx, ty) {
+    this.x = tx * TILE;
+    this.y = ty * TILE;
+    this.w = TILE;
+    this.h = TILE;
+    this.isCooler = true;
+    this.alive = true;
+  }
+
+  get cx() { return this.x + this.w / 2; }
+  get cy() { return this.y + this.h / 2; }
+
+  update() {}
+}
+
 // 可移動的干擾裝置：和箱子一樣可以推、會被空氣砲推動，也會受其他顏色的場域影響
 // （例如重力干擾器可以被時停，但重力場域在它身邊沒有作用）
 export class MovableJammer extends Box {
@@ -180,6 +223,7 @@ export class MovableJammer extends Box {
     super(tx, ty);
     this.kind = kind;
     this.isJammer = true;
+    this.density = 2; // 金屬，會沉
   }
 
   get r() { return cfg.jammerRadius; }
