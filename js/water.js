@@ -97,7 +97,12 @@ export class WaterSystem {
           for (const s of sides) {
             const sx = tx + s.x;
             const sy = ty + s.y;
-            if (!this.inBounds(sx, sy) || this.map.isSolid(sx, sy)) continue;
+            if (!this.inBounds(sx, sy)) continue;
+            if (this.map.isSolid(sx, sy)) {
+              // 側面的牆上有傳送門時，水也會從側面流進去（例如門開在水槽的側壁）
+              a -= this.flowInto(world, sx, sy, s, (start / 3) * rate);
+              continue;
+            }
             const other = A[this.idx(sx, sy)];
             if (other >= start) continue;
             const f = ((start - other) / 3) * rate;
