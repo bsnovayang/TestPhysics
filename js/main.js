@@ -84,6 +84,9 @@ input.onKey((code) => {
     case 'KeyH':
       overlays.help.hidden = !overlays.help.hidden;
       break;
+    case 'Slash':
+      cfg.showHints = !cfg.showHints;
+      break;
     case 'F2':
       if (!debugPanel) {
         world.toast('除錯面板無法載入（需要網路）');

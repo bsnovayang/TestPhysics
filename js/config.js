@@ -64,6 +64,9 @@ export const cfg = {
   // 物件
   boxFriction: 900,
 
+  // 介面
+  showHints: false,      // 房間提示預設隱藏，按 / 顯示（讓玩家先自己嘗試）
+
   // 除錯
   globalTimeScale: 1,
   showHitboxes: false,

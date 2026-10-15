@@ -656,7 +656,7 @@ export class Renderer {
     ctx.fillText(`${world.room.name}（${world.roomIndex + 1}/${world.roomCount}）`, VIEW_W / 2, 10);
     ctx.font = `8px ${FONT}`;
     ctx.fillStyle = C.dim;
-    ctx.fillText(world.room.hint, VIEW_W / 2, 22);
+    ctx.fillText(cfg.showHints ? world.room.hint : '卡關時按 / 顯示提示', VIEW_W / 2, 22);
 
     // 訊息
     world.toasts.forEach((t, i) => {
