@@ -10,8 +10,17 @@ export async function createDebugPanel() {
     return null;
   }
 
-  const gui = new GUI({ title: '除錯參數' });
-  gui.close();
+  const gui = new GUI({ title: '除錯參數（F2）' });
+  gui.hide();
+
+  // 面板裡的按鈕或勾選框有焦點時，空白鍵會觸發它（例如一直展開收合面板）。
+  // 按下空白鍵時先移除焦點，讓空白鍵只用來跳躍。
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && gui.domElement.contains(document.activeElement)) {
+      e.preventDefault();
+      document.activeElement.blur();
+    }
+  }, true);
 
   const world = gui.addFolder('世界');
   world.add(cfg, 'gravity', 100, 2000, 10).name('重力');

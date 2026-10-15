@@ -84,6 +84,14 @@ input.onKey((code) => {
     case 'KeyH':
       overlays.help.hidden = !overlays.help.hidden;
       break;
+    case 'F2':
+      if (!debugPanel) {
+        world.toast('除錯面板無法載入（需要網路）');
+        break;
+      }
+      debugVisible = !debugVisible;
+      debugPanel.show(debugVisible);
+      break;
     case 'BracketRight':
       world.loadRoom(world.roomIndex + 1);
       break;
@@ -142,4 +150,6 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-createDebugPanel();
+let debugPanel = null;
+let debugVisible = false;
+createDebugPanel().then((gui) => { debugPanel = gui; });
