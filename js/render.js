@@ -431,16 +431,18 @@ export class Renderer {
   drawEntity(world, e) {
     const ctx = this.ctx;
     if (e.isHeater) {
-      // 火爐：範圍＋發紅的爐口
-      ctx.strokeStyle = 'rgba(255,140,60,0.35)';
-      ctx.setLineDash([2, 4]);
-      ctx.beginPath();
-      ctx.arc(e.cx, e.cy, cfg.heatRadius, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.setLineDash([]);
+      // 火爐：點燃時顯示範圍和發紅的爐口；熄滅時爐口是暗灰色
+      if (e.on) {
+        ctx.strokeStyle = 'rgba(255,140,60,0.35)';
+        ctx.setLineDash([2, 4]);
+        ctx.beginPath();
+        ctx.arc(e.cx, e.cy, cfg.heatRadius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
       ctx.fillStyle = '#3b2a24';
       ctx.fillRect(e.x, e.y, e.w, e.h);
-      ctx.fillStyle = `rgba(255,${Math.round(110 + Math.sin(world.time * 6) * 30)},40,1)`;
+      ctx.fillStyle = e.on ? `rgba(255,${Math.round(110 + Math.sin(world.time * 6) * 30)},40,1)` : '#5a5f6b';
       ctx.fillRect(e.x + 3, e.y + 4, e.w - 6, 3);
       ctx.fillRect(e.x + 3, e.y + 9, e.w - 6, 3);
       return;

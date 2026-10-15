@@ -161,9 +161,13 @@ export class WaterSystem {
         if (m.time < 0.05) continue; // 時停：蒸氣凍結在原地
         const rate = Math.min(1, m.time);
 
-        // 凝結回水（冷凍裝置附近凝結得很快）
+        // 凝結回水：冷凍裝置附近凝結得很快；碰到天花板（往上那一格被擋住）也凝結得比較快，
+        // 否則蒸氣會一直聚積在天花板下方（例如蒸氣浮台到頂後，火爐熄了也下不來）
         const chilled = this.coolers.some((c) => Math.hypot(cx - c.cx, cy - c.cy) <= cfg.coldRadius);
-        const c = s * Math.min(1, (chilled ? 4 : cfg.steamCondense) * dt * rate);
+        const dn = this.downAt(m);
+        const capped = dn && (!this.inBounds(tx - dn.x, ty - dn.y) || this.blocked(tx - dn.x, ty - dn.y));
+        const rateC = chilled ? 4 : capped ? cfg.steamCondense * 6 : cfg.steamCondense;
+        const c = s * Math.min(1, rateC * dt * rate);
         s -= c;
         this.dew[i] += c / STEAM_EXPANSION;
         this.releaseDew(i);
@@ -237,7 +241,7 @@ export class WaterSystem {
 
   updateTemperature(world, dt) {
     const A = this.amount;
-    const heaters = world.entities.filter((e) => e.isHeater && e.alive);
+    const heaters = world.entities.filter((e) => e.isHeater && e.on && e.alive);
     for (let ty = 0; ty < ROWS; ty++) {
       for (let tx = 0; tx < COLS; tx++) {
         const i = this.idx(tx, ty);

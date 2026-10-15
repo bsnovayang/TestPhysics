@@ -222,15 +222,17 @@ export class Cooler {
   update() {}
 }
 
-// 火爐：範圍內的水沸騰成蒸氣、冰融化。固定、實心
+// 火爐：點燃時，範圍內的水沸騰成蒸氣、冰融化。固定、實心。用空氣砲打它可以點燃或熄滅
 export class Heater {
-  constructor(tx, ty) {
+  constructor(tx, ty, on = true) {
     this.x = tx * TILE;
     this.y = ty * TILE;
     this.w = TILE;
     this.h = TILE;
     this.isHeater = true;
+    this.on = on;
     this.solid = true;
+    this.hittable = true;
     this.alive = true;
   }
 
@@ -238,9 +240,15 @@ export class Heater {
   get cy() { return this.y + this.h / 2; }
 
   update() {}
+
+  onAirShot(world) {
+    this.on = !this.on;
+    world.toast(this.on ? '火爐點燃' : '火爐熄滅');
+    world.burst(this.cx, this.cy, this.on ? '#ff8a3d' : '#666666', 10);
+  }
 }
 
-// 蒸氣浮台：自己和下方一格有蒸氣時被推上去，沒有蒸氣時落下；會載著站在上面的東西一起移動。
+// 蒸氣浮台：下方一格有蒸氣時被推上去，沒有蒸氣時落下；會載著站在上面的東西一起移動。
 // 一般的物體和玩家都不會被蒸氣推動，只有這種平台會
 export class SteamPlatform {
   constructor(tx, ty, widthTiles) {
@@ -262,7 +270,8 @@ export class SteamPlatform {
     this.time = world.fields.sample(this.cx, this.cy).time;
     const ldt = dt * this.time;
     if (ldt <= 0) return;
-    this.steam = world.water.steamInRect(this.x, this.y, this.w, this.h + TILE);
+    // 只看下方：到頂時周圍聚積的蒸氣不算，火爐熄滅、下方的蒸氣散掉後就會落下
+    this.steam = world.water.steamInRect(this.x, this.y + this.h, this.w, TILE);
     if (this.steam > 0.15) {
       const target = -cfg.steamLift * Math.min(1, this.steam / 0.5);
       this.vy = approach(this.vy, target, 300 * ldt);

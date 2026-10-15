@@ -112,15 +112,16 @@ export class AirShot {
         this.dy = d.y;
         continue;
       }
-      if (world.map.pointSolid(nx, ny)) {
-        world.burst(this.x, this.y, '#cfe8ff', 4);
-        this.alive = false;
-        return;
-      }
+      // 先檢查物件再檢查牆：嵌在牆裡的裝置（例如火爐）才打得到
       const hit = world.hitTest(nx, ny, 3, true);
       if (hit) {
         hit.onAirShot(world, { x: this.dx, y: this.dy });
         world.burst(nx, ny, '#cfe8ff', 6);
+        this.alive = false;
+        return;
+      }
+      if (world.map.pointSolid(nx, ny)) {
+        world.burst(this.x, this.y, '#cfe8ff', 4);
         this.alive = false;
         return;
       }

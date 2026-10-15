@@ -40,7 +40,11 @@ function parseRoom(def) {
         case '%': grid[ty][tx] = '^'; water.push({ tx, ty }); continue; // 泡在水裡的尖刺
         case 'Y': entities.push(new IceBlock(tx, ty)); break;
         case 'C': entities.push(new Cooler(tx, ty)); break;
-        case 'H': entities.push(new Heater(tx, ty)); grid[ty][tx] = '#'; continue; // 火爐嵌在牆裡，水不會從它的位置漏出去
+        case 'H': // 點燃的火爐
+        case 'G': // 熄滅的火爐
+          entities.push(new Heater(tx, ty, c === 'H'));
+          grid[ty][tx] = '#'; // 火爐嵌在牆裡，水不會從它的位置漏出去
+          continue;
         case 'W': switches.push(new Switch(tx, ty, 'steam')); break;
         case 'X': entities.push(new Emitter(tx, ty)); break;
         case 'R': switches.push(new Switch(tx, ty, 'light')); break;
