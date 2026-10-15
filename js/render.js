@@ -645,9 +645,46 @@ export class Renderer {
     ctx.textBaseline = 'alphabetic';
   }
 
+  // 游標旁的施放方式提示
+  drawCastHint(world, x, y) {
+    const ctx = this.ctx;
+    let text = null;
+    let color = '#e8edf5';
+    if (world.fields.channeling) {
+      text = '維持中：放開按鍵結束';
+      color = '#ffd34d';
+    } else if (world.isSelfCast()) {
+      if (cfg.selfAttachUnlocked) {
+        text = '長按：附著自己（持續耗 MP）';
+        color = '#78ffb4';
+      } else {
+        text = '自身附著尚未解鎖';
+        color = '#7d869a';
+      }
+    } else {
+      const pv = world.previewWeb();
+      if (pv.target) {
+        text = '按一下：附著在目標上';
+        color = '#78ffb4';
+      }
+    }
+    if (!text) return;
+    ctx.font = `8px ${FONT}`;
+    const w = ctx.measureText(text).width;
+    // 靠近右邊緣時改顯示在游標左側
+    const tx = x + 10 + w > VIEW_W - 4 ? x - 10 - w : x + 10;
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(tx - 3, y + 6, w + 6, 12);
+    ctx.fillStyle = color;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, tx, y + 12);
+    ctx.textBaseline = 'alphabetic';
+  }
+
   drawCursor(world) {
     const ctx = this.ctx;
     const { x, y } = world.mouse;
+    this.drawCastHint(world, x, y);
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 1;
     ctx.beginPath();

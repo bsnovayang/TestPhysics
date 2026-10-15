@@ -32,7 +32,9 @@
     #start .panel { text-align: center; }
     .big { font-size: 16px; color: var(--text); margin-top: 16px; }
     #help { background: transparent; pointer-events: none; justify-content: flex-start; align-items: flex-start; }
-    #help .panel { pointer-events: auto; margin: 16px; max-width: 360px; }
+    #help .panel { pointer-events: auto; margin: 16px; max-width: 420px; }
+    .cast { margin-top: 4px; text-align: left; }
+    td b { color: #ffd34d; font-weight: normal; }
     .grid { display: flex; flex-wrap: wrap; gap: 6px; }
     .grid button { font: inherit; color: var(--text); background: #1c2230; border: 1px solid #2a3142;
       border-left: 4px solid #555; border-radius: 4px; padding: 6px 10px; min-width: 96px; text-align: left; cursor: pointer; }
@@ -48,26 +50,41 @@
     <div class="panel">
       <h1>TestPhysics 原型</h1>
       <p>發射「網」展開物理場域，改寫區域內的重力與時間。</p>
-      <p>A/D 移動、Space 跳躍、滑鼠瞄準；左鍵空氣砲，右鍵與 Q/E/R/F 施放技能。</p>
+      <table class="cast">
+        <tr><td>A / D、Space</td><td>移動、跳躍</td></tr>
+        <tr><td>滑鼠左鍵</td><td>空氣砲</td></tr>
+        <tr><td>右鍵、Q E R F</td><td>施放技能（對準游標）</td></tr>
+      </table>
+      <h2>技能的三種施放方式</h2>
+      <table class="cast">
+        <tr><td>游標指向空地或牆</td><td><b>按一下</b>：場域固定在那裡，3 秒後消失</td></tr>
+        <tr><td>游標指向箱子、敵人</td><td><b>按一下</b>：場域附著在對方身上，跟著移動</td></tr>
+        <tr><td>游標指向自己<br>（或按住 C）</td><td><b>長按</b>：場域附著在自己身上，持續消耗 MP，放開就結束</td></tr>
+      </table>
+      <p>遊戲中按 H 可以隨時查看說明。</p>
       <p class="big">點擊開始</p>
     </div>
   </div>
 
   <div id="help" class="overlay" hidden>
     <div class="panel">
-      <h2>操作</h2>
+      <h2>基本操作</h2>
       <table>
         <tr><td>A / D</td><td>移動（重力朝側面時改用 W / S）</td></tr>
         <tr><td>Space</td><td>跳躍</td></tr>
         <tr><td>Shift</td><td>衝刺（空中一次）</td></tr>
         <tr><td>左鍵</td><td>空氣砲（按住連射，有後座力）</td></tr>
-        <tr><td>右鍵 Q E R F</td><td>技能欄 1～5，對游標位置施放</td></tr>
-        <tr><td>游標指著自己／按住 C</td><td>對自己施放：按住技能鍵維持，持續消耗 MP，放開就結束</td></tr>
-        <tr><td>網打中箱子或敵人</td><td>場域附著在對方身上，跟著移動</td></tr>
         <tr><td>X／中鍵</td><td>解除所有場域</td></tr>
         <tr><td>Tab</td><td>裝備選單（暫停）</td></tr>
         <tr><td>Esc</td><td>暫停</td></tr>
       </table>
+      <h2>施放技能（右鍵、Q E R F）</h2>
+      <table>
+        <tr><td>指向空地或牆</td><td><b>按一下</b>：固定場域，3 秒後消失</td></tr>
+        <tr><td>指向箱子、敵人</td><td><b>按一下</b>：附著在對方身上</td></tr>
+        <tr><td>指向自己／按住 C</td><td><b>長按</b>：附著在自己身上，每秒消耗 MP，放開就結束</td></tr>
+      </table>
+      <p>游標旁會顯示目前的施放方式。場上最多 2 個固定場域，再放會取代最舊的；附著自己的場域不算在內。</p>
       <h2>除錯</h2>
       <table>
         <tr><td>1～9</td><td>把技能直接放到右鍵</td></tr>
