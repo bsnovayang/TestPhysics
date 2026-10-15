@@ -1,6 +1,6 @@
 import { cfg, TILE, COLS, ROWS, VIEW_W, VIEW_H, SLOT_KEYS } from './config.js';
 import { SKILLS, TREE_COLORS } from './skills.js';
-import { Box, MovingPlatform, Blade, Crusher } from './objects.js';
+import { Box, BoxSpawner, MovingPlatform, Blade, Crusher } from './objects.js';
 import { Heavy, Jumper, Flyer, Turret } from './enemies.js';
 
 const FONT = '"Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif';
@@ -261,6 +261,20 @@ export class Renderer {
 
   drawEntity(world, e) {
     const ctx = this.ctx;
+    if (e instanceof BoxSpawner) {
+      // 生成器：外框＋補充進度條
+      ctx.strokeStyle = '#8a6435';
+      ctx.setLineDash([2, 2]);
+      ctx.strokeRect(e.x + 0.5, e.y + 0.5, e.w - 1, e.h - 1);
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#8a6435';
+      ctx.fillRect(e.x - 2, e.y - 4, e.w + 4, 2);
+      if (e.progress < 1) {
+        ctx.fillStyle = '#ffd34d';
+        ctx.fillRect(e.x - 2, e.y - 4, (e.w + 4) * e.progress, 2);
+      }
+      return;
+    }
     if (e instanceof Box) {
       ctx.fillStyle = C.box;
       ctx.fillRect(e.x, e.y, e.w, e.h);

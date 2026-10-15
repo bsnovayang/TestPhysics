@@ -9,6 +9,7 @@ export class Box extends Body {
     this.solid = true;
     this.pushable = true;
     this.hittable = true;
+    this.restsOnSpikes = true; // 尖刺對箱子是實心的：箱子可以壓在尖刺上，把尖刺蓋住
     this.pushV = 0;
   }
 
@@ -148,6 +149,54 @@ export class Crusher {
         break;
     }
     if (world.overlap(this, world.player)) world.hurtPlayer(2, { fromX: this.cx });
+  }
+}
+
+// 箱子生成器：箱子被拿走（離開生成點）或消失後，過一段時間補一個新的。
+// 同一個生成器產生的箱子超過上限時，最舊的那個會消失
+export class BoxSpawner {
+  constructor(tx, ty) {
+    this.tx = tx;
+    this.ty = ty;
+    this.x = tx * TILE;
+    this.y = ty * TILE;
+    this.w = TILE;
+    this.h = TILE;
+    this.alive = true;
+    this.boxes = [];
+    this.current = null;
+    this.delay = 1;
+    this.timer = this.delay; // 房間載入時立刻生成第一個
+    this.maxBoxes = 4;
+  }
+
+  update(world, dt) {
+    this.boxes = this.boxes.filter((b) => b.alive);
+    const taken = !this.current || !this.current.alive
+      || Math.hypot(this.current.x - this.x, this.current.y - this.y) > TILE * 1.5;
+    if (!taken) return;
+    this.current = null;
+    this.timer += dt;
+    if (this.timer < this.delay) return;
+    // 生成點被擋住（包括玩家站在上面）時先等，避免箱子生成在別的東西裡面
+    if (world.rectBlocked(this.x, this.y, this.w, this.h, null)) return;
+    if (world.bodies().some((b) => rectsOverlap(b, this))) return;
+    this.timer = 0;
+    const box = new Box(this.tx, this.ty);
+    world.entities.push(box);
+    this.boxes.push(box);
+    this.current = box;
+    world.burst(box.cx, box.cy, '#b98a4f', 10);
+    while (this.boxes.length > this.maxBoxes) {
+      const old = this.boxes.shift();
+      old.alive = false;
+      world.burst(old.cx, old.cy, '#b98a4f', 12);
+    }
+  }
+
+  // 補充進度（0～1），畫面用
+  get progress() {
+    return this.current ? 1 : Math.min(1, this.timer / this.delay);
   }
 }
 

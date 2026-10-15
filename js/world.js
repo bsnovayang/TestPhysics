@@ -6,7 +6,7 @@ import { PortalSystem } from './portals.js';
 import { rectsOverlap, impactDamage } from './body.js';
 import { Player } from './player.js';
 import { Web } from './projectiles.js';
-import { Box, MovingPlatform, Blade, Crusher, Switch } from './objects.js';
+import { Box, BoxSpawner, MovingPlatform, Blade, Crusher, Switch } from './objects.js';
 import { Walker, Heavy, Jumper, Flyer, Turret } from './enemies.js';
 import { ROOMS } from './rooms.js';
 
@@ -28,6 +28,7 @@ function parseRoom(def) {
         case 'P': spawn = { tx, ty }; break;
         case 'B': entities.push(new Box(tx, ty)); break;
         case 'K': entities.push(new Box(tx, ty, true)); break;
+        case '@': entities.push(new BoxSpawner(tx, ty)); break;
         case 'L': switches.push(new Switch(tx, ty, 'lock')); break;
         case 'S': switches.push(new Switch(tx, ty, 'plate')); break;
         case 'O': entities.push(new Blade(tx, ty)); break;
@@ -124,6 +125,7 @@ export class World {
   // 碰撞查詢：回傳 'tile'、擋住的實心物件，或 null
   rectBlocked(x, y, w, h, self) {
     if (this.solidTiles(x, y, w, h)) return 'tile';
+    if (self?.restsOnSpikes && this.map.rectSpikes(x, y, w, h)) return 'tile';
     for (const e of this.entities) {
       if (e === self || !e.solid || !e.alive) continue;
       if (x < e.x + e.w && x + w > e.x && y < e.y + e.h && y + h > e.y) return e;
