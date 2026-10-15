@@ -67,6 +67,7 @@ export class Renderer {
     this.drawTiles(world);
     // 實驗版本可以自訂水的畫法（粒子水），或在原本的水上加特效
     if (!world.water.draw?.(this.ctx, world)) this.drawWater(world);
+    if (!world.water.drawsLava) this.drawLava(world);
     this.fx?.draw(this.ctx, world);
     this.drawPortals(world);
     this.drawSwitchesAndDoors(world);
@@ -118,6 +119,15 @@ export class Renderer {
           ctx.fillRect(x + 2, y + 2, 5, 2);
           ctx.strokeStyle = '#8cc8e8';
           ctx.strokeRect(x + 0.5, y + 0.5, TILE - 1, TILE - 1);
+        } else if (c === 'Q') {
+          // 石頭：熔岩凝固而成，深灰色帶一點紅
+          ctx.fillStyle = '#3d3436';
+          ctx.fillRect(x, y, TILE, TILE);
+          ctx.fillStyle = '#4f4446';
+          ctx.fillRect(x + 2, y + 3, 5, 3);
+          ctx.fillRect(x + 9, y + 9, 4, 3);
+          ctx.fillStyle = 'rgba(200,80,40,0.35)';
+          ctx.fillRect(x + 6, y + 12, 3, 1);
         } else if (c === 'Z') {
           // 熔岩：橘紅色，表面有流動的亮紋
           ctx.fillStyle = '#c4361b';
@@ -178,6 +188,31 @@ export class Renderer {
         if (frozen) {
           ctx.strokeStyle = 'rgba(200,240,255,0.8)';
           ctx.strokeRect(x + 0.5, y + 0.5, TILE - 1, h - 1);
+        }
+      }
+    }
+  }
+
+  // 熔岩：從格子底部往上填，表面有流動的亮紋；被時停的熔岩畫成暗紅色並加框（可以站、不燙）
+  drawLava(world) {
+    const ctx = this.ctx;
+    const w = world.water;
+    for (let ty = 0; ty < ROWS; ty++) {
+      for (let tx = 0; tx < COLS; tx++) {
+        if (w.lavaAt(tx, ty) <= 0.02) continue;
+        const r = w.liquidRect(w.lava, tx, ty);
+        const frozen = w.frozenLava.has(w.idx(tx, ty));
+        ctx.fillStyle = frozen ? '#6b2a1c' : '#c4361b';
+        ctx.fillRect(r.x, r.y, r.w, r.h);
+        const top = w.lavaAt(tx, ty - 1) <= 0.02;
+        if (frozen) {
+          ctx.strokeStyle = 'rgba(200,240,255,0.6)';
+          ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+        } else if (top) {
+          ctx.fillStyle = '#ff8a3d';
+          ctx.fillRect(r.x, r.y + Math.sin(world.time * 3 + tx) * 1, r.w, 2);
+          ctx.fillStyle = 'rgba(255,210,120,0.8)';
+          ctx.fillRect(r.x + ((world.time * 10 + tx * 7) % TILE), r.y + Math.min(r.h - 2, 6), 3, 2);
         }
       }
     }

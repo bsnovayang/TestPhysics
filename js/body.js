@@ -169,7 +169,7 @@ export class Body {
   }
 
   touchingLava(world, inset = 3) {
-    return world.map.rectLava(this.x + inset, this.y + inset, this.w - inset * 2, this.h - inset * 2);
+    return world.water.lavaOverlap(this.x + inset, this.y + inset, this.w - inset * 2, this.h - inset * 2);
   }
 
   touchingSpikes(world, inset = 2) {

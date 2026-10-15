@@ -67,6 +67,12 @@ export function traceBeam(world, x, y, dx, dy, source = null, hitsPlayer = true)
       break;
     }
 
+    // 熔岩不透光
+    if (world.water.pointInLava(nx, ny)) {
+      cur.push({ x: nx, y: ny });
+      hit = { type: 'wall' };
+      break;
+    }
     // 濃的蒸氣會擋住光線（可以當成擋雷射的煙幕）。水裡的蒸氣是氣泡，不擋光，
     // 否則雷射剛把水煮出蒸氣，就會被自己煮出來的蒸氣擋住
     if (world.water.pointSteam(nx, ny) > cfg.steamBlock && !world.water.pointInWater(nx, ny)) {

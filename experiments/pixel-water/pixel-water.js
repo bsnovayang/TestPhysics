@@ -14,10 +14,12 @@ const CELLS_PER_TILE = PER * PER; // 一整格水 = 64 個水像素
 const EMPTY = 0;
 const WATER = 1;
 const STEAM = 2;
+const LAVA = 3;
 
 export const params = {
   DISPERSE: 4,      // 水被擋住時，一幀最多往旁邊散開幾格（越大水面攤平得越快）
   STEAM_RISE: 0.4,  // 蒸氣每一幀往上飄的機率（約每秒 3 格大格）
+  LAVA_RATE: 0.4,   // 熔岩每一幀移動的機率（很黏，流得慢）
 };
 
 export class PixelWaterSystem extends WaterSystem {
@@ -34,6 +36,18 @@ export class PixelWaterSystem extends WaterSystem {
     this.tCold = new Uint8Array(COLS * ROWS);
     this.convertFrac = new Float32Array(COLS * ROWS);
     this.drawsSteam = true;
+    this.drawsLava = true;
+    // 地圖上的熔岩（父類別已經轉成熔岩量）變成熔岩像素
+    for (let ty = 0; ty < ROWS; ty++) for (let tx = 0; tx < COLS; tx++) {
+      if (this.lava[this.idx(tx, ty)] > 0) this.fillTile(tx, ty, LAVA, Math.round(this.lava[this.idx(tx, ty)] * CELLS_PER_TILE));
+    }
+  }
+
+  pointInLava(x, y) {
+    const fx = Math.floor(x / FS);
+    const fy = Math.floor(y / FS);
+    if (fx < 0 || fx >= FW || fy < 0 || fy >= FH) return false;
+    return this.mat[this.fi(fx, fy)] === LAVA;
   }
 
   fi(fx, fy) { return fy * FW + fx; }
@@ -129,11 +143,13 @@ export class PixelWaterSystem extends WaterSystem {
     this.displace();
     this.simulate(world, dt);
     this.derive();
-    // 溫度沿用原版（火爐、熔岩、冷凍裝置）；結冰的格子要清掉裡面的水像素
+    this.reactPixels(world);
+    // 溫度沿用原版（火爐、熔岩、冷凍裝置）；結冰或凝固成石頭的格子要清掉裡面的像素
     super.updateTemperature(world, dt);
     for (let ty = 0; ty < ROWS; ty++) {
       for (let tx = 0; tx < COLS; tx++) {
-        if (this.map.get(tx, ty) !== 'I') continue;
+        const c = this.map.get(tx, ty);
+        if (c !== 'I' && c !== 'Q') continue;
         for (let y = 0; y < PER; y++) for (let x = 0; x < PER; x++) this.mat[this.fi(tx * PER + x, ty * PER + y)] = EMPTY;
       }
     }
@@ -214,7 +230,8 @@ export class PixelWaterSystem extends WaterSystem {
     }
     const i = this.fi(fx, fy);
     const other = this.mat[j];
-    if (other === EMPTY || (m === WATER && other === STEAM)) {
+    // 重的往下沉：水會和蒸氣交換位置，熔岩會和水、蒸氣交換位置
+    if (other === EMPTY || (m === WATER && other === STEAM) || (m === LAVA && (other === WATER || other === STEAM))) {
       this.mat[j] = m;
       this.mat[i] = other; // 水比蒸氣重：和蒸氣交換位置
       this.stamp[j] = this.frame;
@@ -243,6 +260,13 @@ export class PixelWaterSystem extends WaterSystem {
         const sy = dy !== 0 ? 0 : 1;
         const r = Math.random() < 0.5 ? 1 : -1;
 
+        if (m === LAVA) {
+          if (Math.random() > P.LAVA_RATE) continue;
+          if (this.tryMove(world, fx, fy, fx + dx, fy + dy, m)) continue;
+          if (this.tryMove(world, fx, fy, fx + dx + sx * r, fy + dy + sy * r, m)) continue;
+          if (Math.random() < 0.5) this.tryMove(world, fx, fy, fx + sx * r, fy + sy * r, m);
+          continue;
+        }
         if (m === WATER) {
           if (this.tryMove(world, fx, fy, fx + dx, fy + dy, m)) continue;
           if (this.tryMove(world, fx, fy, fx + dx + sx * r, fy + dy + sy * r, m)) continue;
@@ -287,11 +311,51 @@ export class PixelWaterSystem extends WaterSystem {
     return Math.random() < rate * dt;
   }
 
+  // 熔岩碰到水：熔岩夠多的格子凝固成石頭，裡面的水變成蒸氣冒到上方；熔岩太少時只把碰到的水煮成蒸氣
+  reactPixels(world) {
+    for (let ty = 0; ty < ROWS; ty++) {
+      for (let tx = 0; tx < COLS; tx++) {
+        const t = this.idx(tx, ty);
+        if (this.lava[t] <= 0.02 || this.frozenLava.has(t)) continue;
+        // 水比熔岩輕，會浮在熔岩上（在上方那一格），所以上方那一格有水也算碰到
+        const ux = -this.tDown[t * 2] || 0;
+        const uy = -this.tDown[t * 2 + 1] || -1;
+        const above = this.inBounds(tx + ux, ty + uy) ? this.amount[this.idx(tx + ux, ty + uy)] : 0;
+        if (this.amount[t] <= 0.02 && above <= 0.05) continue;
+        const waterPx = Math.round(this.amount[t] * CELLS_PER_TILE);
+        if (this.lava[t] >= 0.3 && !this.occupied(world, tx, ty)) {
+          for (let y = 0; y < PER; y++) for (let x = 0; x < PER; x++) this.mat[this.fi(tx * PER + x, ty * PER + y)] = EMPTY;
+          this.map.set(tx, ty, 'Q');
+          if (ty > 0 && !this.blocked(tx, ty - 1)) this.fillTile(tx, ty - 1, STEAM, waterPx);
+          // 浮在熔岩上方的水被煮成蒸氣
+          const ax = tx + ux;
+          const ay = ty + uy;
+          if (this.inBounds(ax, ay)) {
+            for (let y = 0; y < PER; y++) for (let x = 0; x < PER; x++) {
+              const i = this.fi(ax * PER + x, ay * PER + y);
+              if (this.mat[i] === WATER) this.mat[i] = STEAM;
+            }
+          }
+          world.burst(tx * TILE + 8, ty * TILE + 8, '#bbbbbb', 12);
+        } else {
+          for (let y = 0; y < PER; y++) for (let x = 0; x < PER; x++) {
+            const i = this.fi(tx * PER + x, ty * PER + y);
+            if (this.mat[i] === WATER) this.mat[i] = STEAM;
+            else if (this.mat[i] === LAVA) this.mat[i] = EMPTY;
+          }
+        }
+      }
+    }
+    this.derive();
+  }
+
   // 換算回每個大格的水量與蒸氣量；被時停的水格標記為實心
   derive() {
     this.amount.fill(0);
     this.steam.fill(0);
+    this.lava.fill(0);
     this.frozen.clear();
+    this.frozenLava.clear();
     for (let fy = 0; fy < FH; fy++) {
       const ty = fy >> 3;
       for (let fx = 0; fx < FW; fx++) {
@@ -299,10 +363,15 @@ export class PixelWaterSystem extends WaterSystem {
         if (!m) continue;
         const t = ty * COLS + (fx >> 3);
         if (m === WATER) this.amount[t] += 1 / CELLS_PER_TILE;
+        else if (m === LAVA) this.lava[t] += 1 / CELLS_PER_TILE;
         else this.steam[t] += STEAM_EXPANSION / CELLS_PER_TILE;
       }
     }
-    for (let t = 0; t < this.amount.length; t++) if (this.amount[t] > 0 && this.tTime[t] < 0.05) this.frozen.add(t);
+    for (let t = 0; t < this.amount.length; t++) {
+      if (this.tTime[t] >= 0.05) continue;
+      if (this.amount[t] > 0) this.frozen.add(t);
+      if (this.lava[t] > 0) this.frozenLava.add(t);
+    }
   }
 
   // ---- 畫面：直接輸出像素 ----
@@ -346,6 +415,16 @@ export class PixelWaterSystem extends WaterSystem {
           if (this.tTime[t] < 0.05) { W[o] = 150 + v; W[o + 1] = 215 + v; W[o + 2] = 250; W[o + 3] = 220; }
           else if (surface) { W[o] = 110 + v; W[o + 1] = 175 + v; W[o + 2] = 245; W[o + 3] = 235; }
           else { W[o] = 38 + v; W[o + 1] = 105 + v + ((n + shimmer) % 16 === 0 ? 20 : 0); W[o + 2] = 215 + v; W[o + 3] = 210; }
+        } else if (m === LAVA) {
+          const v = (n >> 4) - 8;
+          const ux = -this.tDown[t * 2] || 0;
+          const uy = -this.tDown[t * 2 + 1] || -1;
+          const ax = fx + ux;
+          const ay = fy + uy;
+          const surface = ax >= 0 && ax < FW && ay >= 0 && ay < FH && this.mat[this.fi(ax, ay)] !== LAVA && !this.mask[this.fi(ax, ay)];
+          if (this.tTime[t] < 0.05) { W[o] = 110 + v; W[o + 1] = 45; W[o + 2] = 30; W[o + 3] = 255; }
+          else if (surface) { W[o] = 255; W[o + 1] = 150 + v; W[o + 2] = 60; W[o + 3] = 255; }
+          else { W[o] = 200 + v; W[o + 1] = 55 + v + ((n + shimmer * 3) % 23 === 0 ? 60 : 0); W[o + 2] = 25; W[o + 3] = 255; }
         } else {
           const v = (n >> 5);
           S[o] = 225 + v; S[o + 1] = 230 + v; S[o + 2] = 240; S[o + 3] = 90 + ((n + shimmer * 7) & 63);

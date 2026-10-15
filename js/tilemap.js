@@ -6,7 +6,8 @@ import { TILE, COLS, ROWS } from './config.js';
 //   D  門（關閉時實心）
 //   |  移動平台的折返標記（只對平台有效，其他物體可以穿過）
 //   I  冰牆格（實心、很滑；被光照到會融化，水遇冷會結成冰牆格）
-//   Z  熔岩（不實心，碰到會受傷；讓相鄰的水沸騰、冰融化）
+//   Z  熔岩（載入時轉成會流動的熔岩液體，由 WaterSystem 處理）
+//   Q  石頭（熔岩碰到水或冷凍裝置凝固而成；實心、永久）
 export class TileMap {
   constructor(rows) {
     // 存成字元陣列，讓冰可以在遊戲中出現或消失
@@ -26,7 +27,7 @@ export class TileMap {
 
   isSolid(tx, ty) {
     const c = this.get(tx, ty);
-    return c === '#' || c === 'I' || (c === 'D' && !this.doorOpen);
+    return c === '#' || c === 'I' || c === 'Q' || (c === 'D' && !this.doorOpen);
   }
 
   pointSolid(x, y) {

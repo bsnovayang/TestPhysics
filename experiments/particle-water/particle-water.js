@@ -127,6 +127,8 @@ export class ParticleWaterSystem extends WaterSystem {
     // 蒸氣與溫度沿用原版（它們會改動格子的水量），再把改動換算回粒子
     this.inUpdate = true;
     const before = this.amount.slice();
+    this.updateLava(world);   // 熔岩沿用原版的格子熔岩
+    this.react(world);
     this.updateSteam(world, dt);
     this.updateTemperature(world, dt);
     this.inUpdate = false;
