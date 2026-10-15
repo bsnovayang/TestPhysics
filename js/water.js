@@ -91,15 +91,23 @@ export class WaterSystem {
   }
 
   // 矩形是否碰到被時停的水（實心）。self 目前已經泡在裡面的格子不算，避免被封在水裡出不來
+  // 被時停的水格中，真正有水的那一部分（水從格子底部往上填；上方也有水時整格）
+  frozenRect(tx, ty) {
+    const a = this.get(tx, ty);
+    const full = a >= 0.99 || this.get(tx, ty - 1) > 0.01;
+    const h = full ? TILE : Math.max(2, a * TILE);
+    return { x: tx * TILE, y: ty * TILE + TILE - h, w: TILE, h };
+  }
+
+  // 矩形是否碰到被時停的水（實心，只有有水的那一部分）。self 目前已經泡在裡面的部分不算，避免被封在水裡出不來
   frozenOverlap(x, y, w, h, self) {
     if (!this.frozen.size) return false;
+    const hit = (r, a) => a.x < r.x + r.w && a.x + a.w > r.x && a.y < r.y + r.h && a.y + a.h > r.y;
     return this.map.anyTileInRect(x, y, w, h, (tx, ty) => {
       if (!this.frozen.has(this.idx(tx, ty))) return false;
-      if (!self) return true;
-      const cx = tx * TILE;
-      const cy = ty * TILE;
-      const inside = self.x < cx + TILE && self.x + self.w > cx && self.y < cy + TILE && self.y + self.h > cy;
-      return !inside;
+      const r = this.frozenRect(tx, ty);
+      if (!hit(r, { x, y, w, h })) return false;
+      return !(self && hit(r, self));
     });
   }
 
@@ -133,7 +141,7 @@ export class WaterSystem {
 
         const m = world.fields.sample(tx * TILE + TILE / 2, ty * TILE + TILE / 2);
         if (m.time < 0.05) {
-          if (a >= 0.5) this.frozen.add(i);
+          this.frozen.add(i); // 不管多少水都凍結（原本只凍半格以上，水面最上層會像破了洞）
           continue;
         }
         const down = this.downAt(m);
