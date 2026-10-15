@@ -1,6 +1,6 @@
 import { cfg, COLS, ROWS } from './config.js';
 import { TileMap } from './tilemap.js';
-import { FieldSystem } from './fields.js';
+import { Field, FieldSystem } from './fields.js';
 import { SKILLS, DEFAULT_LOADOUT } from './skills.js';
 import { rectsOverlap } from './body.js';
 import { Player } from './player.js';
@@ -145,8 +145,24 @@ export class World {
     const dx = end.x - o.x;
     const dy = end.y - o.y;
     const d = Math.hypot(dx, dy);
-    const dir = d > 0.001 ? { x: dx / d, y: dy / d } : { x: p.facing, y: 0 };
+    // 游標太靠近自己時（例如對自己施放定向重力），方向改用面向
+    const dir = d > 8 ? { x: dx / d, y: dy / d } : { x: p.facing, y: 0 };
+
+    if (this.isSelfCast()) {
+      this.fields.add(new Field(p.cx, p.cy, id, dir, p));
+      this.burst(p.cx, p.cy, '#ffffff', 10);
+      return;
+    }
     this.projectiles.push(new Web(o.x, o.y, end.x, end.y, id, dir));
+  }
+
+  // 對自己施放：游標指在自己身上，或按住 C
+  isSelfCast() {
+    const p = this.player;
+    const m = this.mouse;
+    const pad = 4;
+    const onSelf = m.x > p.x - pad && m.x < p.x + p.w + pad && m.y > p.y - pad && m.y < p.y + p.h + pad;
+    return onSelf || this.input.isDown('KeyC');
   }
 
   clampToRange(origin, target) {
@@ -158,8 +174,10 @@ export class World {
   }
 
   // 預覽：網實際會在哪裡展開（和 Web.update 使用相同的判定）
+  // target：場域會附著的對象
   previewWeb() {
     const o = this.player.shoulder();
+    if (this.isSelfCast()) return { o, x: this.player.cx, y: this.player.cy, blocked: false, target: this.player };
     const end = this.clampToRange(o, this.mouse);
     const dx = end.x - o.x;
     const dy = end.y - o.y;
@@ -170,11 +188,16 @@ export class World {
       const step = Math.min(4, d - t);
       const nx = x + (dx / d) * step;
       const ny = y + (dy / d) * step;
-      if (this.map.pointSolid(nx, ny) || this.hitTest(nx, ny, 2)) return { o, x, y, blocked: true };
+      if (this.map.pointSolid(nx, ny)) return { o, x, y, blocked: true, target: null };
+      const hit = this.hitTest(nx, ny, 2);
+      if (hit) {
+        if (hit.isBody) return { o, x: hit.cx, y: hit.cy, blocked: true, target: hit };
+        return { o, x, y, blocked: true, target: null };
+      }
       x = nx;
       y = ny;
     }
-    return { o, x, y, blocked: false };
+    return { o, x, y, blocked: false, target: null };
   }
 
   hurtPlayer(amount, { respawn = false, fromX = null } = {}) {
@@ -224,6 +247,7 @@ export class World {
       this.updateSwitches();
     }
 
+    this.fields.followTargets();
     this.entities = this.entities.filter((e) => e.alive);
     this.projectiles = this.projectiles.filter((p) => p.alive);
 

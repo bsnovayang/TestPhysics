@@ -50,6 +50,22 @@ export class Body {
   applyGravity(ldt) {
     this.vx += this.mods.gx * ldt;
     this.vy += this.mods.gy * ldt;
+    this.applyDrag(ldt);
+  }
+
+  // 只削減「逆著場域重力」的速度：順著重力衝出去不受影響（電梯保有衝力），
+  // 掉回場域時才會被減速，所以來回彈跳會一次比一次小，最後穩定漂浮
+  applyDrag(ldt) {
+    if (!this.mods.drag) return;
+    const g = Math.hypot(this.mods.gx, this.mods.gy);
+    if (g < 1) return;
+    const ux = this.mods.gx / g;
+    const uy = this.mods.gy / g;
+    const along = this.vx * ux + this.vy * uy;
+    if (along >= 0) return;
+    const cut = along * (1 - Math.exp(-this.mods.drag * ldt));
+    this.vx -= ux * cut;
+    this.vy -= uy * cut;
   }
 
   clampVelocity() {

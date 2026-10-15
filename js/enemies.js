@@ -157,6 +157,7 @@ export class Flyer extends Enemy {
     }
     this.vx += ax * ldt;
     this.vy += ay * ldt;
+    this.applyDrag(ldt);
     this.clampVelocity();
     this.lastMove = this.moveByVelocity(world, ldt);
   }

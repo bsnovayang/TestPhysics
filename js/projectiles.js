@@ -4,6 +4,7 @@ import { Field } from './fields.js';
 const WEB_STEP = 4;
 
 // 網：朝目標直線飛行，到達目標或碰到東西時展開場域。飛行中不受場域影響。
+// 擊中箱子或敵人時，場域會附著在對方身上。
 export class Web {
   constructor(x, y, tx, ty, skillId, dir) {
     this.x = x;
@@ -25,16 +26,20 @@ export class Web {
       const step = Math.min(WEB_STEP, remaining, dist);
       const nx = this.x + (dx / dist) * step;
       const ny = this.y + (dy / dist) * step;
-      if (world.map.pointSolid(nx, ny) || world.hitTest(nx, ny, 2)) return this.expand(world);
+      if (world.map.pointSolid(nx, ny)) return this.expand(world);
+      const hit = world.hitTest(nx, ny, 2);
+      if (hit) return this.expand(world, hit.isBody ? hit : null);
       this.x = nx;
       this.y = ny;
       remaining -= step;
     }
   }
 
-  expand(world) {
-    world.fields.add(new Field(this.x, this.y, this.skillId, this.dir));
-    world.burst(this.x, this.y, '#ffffff', 10);
+  expand(world, target = null) {
+    const x = target ? target.cx : this.x;
+    const y = target ? target.cy : this.y;
+    world.fields.add(new Field(x, y, this.skillId, this.dir, target));
+    world.burst(x, y, '#ffffff', 10);
     this.alive = false;
   }
 }

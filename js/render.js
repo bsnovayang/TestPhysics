@@ -443,9 +443,12 @@ export class Renderer {
       const color = TREE_COLORS[f.skill.tree];
       ctx.strokeStyle = color;
       ctx.globalAlpha = 0.5;
+      // 附著的場域用虛線外框，和固定在原地的場域區分
+      if (f.target) ctx.setLineDash([3, 3]);
       ctx.beginPath();
       ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
       ctx.stroke();
+      ctx.setLineDash([]);
       // 剩餘時間
       ctx.globalAlpha = 0.95;
       ctx.lineWidth = 2;
@@ -518,16 +521,24 @@ export class Renderer {
     const ctx = this.ctx;
     const pv = world.previewWeb();
     ctx.save();
-    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
     ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.moveTo(pv.o.x, pv.o.y);
-    ctx.lineTo(pv.x, pv.y);
-    ctx.stroke();
-    ctx.strokeStyle = pv.blocked ? 'rgba(255,200,120,0.5)' : 'rgba(255,255,255,0.3)';
+    if (pv.target !== world.player) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.beginPath();
+      ctx.moveTo(pv.o.x, pv.o.y);
+      ctx.lineTo(pv.x, pv.y);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = pv.target ? 'rgba(120,255,180,0.6)' : pv.blocked ? 'rgba(255,200,120,0.5)' : 'rgba(255,255,255,0.3)';
     ctx.beginPath();
     ctx.arc(pv.x, pv.y, cfg.fieldRadius, 0, Math.PI * 2);
     ctx.stroke();
+    // 會附著的對象加上外框
+    if (pv.target) {
+      ctx.setLineDash([]);
+      ctx.strokeRect(pv.target.x - 2.5, pv.target.y - 2.5, pv.target.w + 5, pv.target.h + 5);
+      ctx.setLineDash([4, 4]);
+    }
     // 射程
     ctx.strokeStyle = 'rgba(255,255,255,0.06)';
     ctx.setLineDash([2, 6]);
