@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TestPhysics 原型</title>
+  <style>
+    :root {
+      --bg: #0d0f14;
+      --panel: rgba(16, 19, 27, 0.94);
+      --text: #e8edf5;
+      --dim: #8a93a6;
+      --accent: #4aa8ff;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+      font-family: "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif; overflow: hidden; }
+    #wrap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+    #game { display: block; cursor: none; }
+    .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      background: rgba(5, 6, 10, 0.6); z-index: 10; }
+    .overlay[hidden] { display: none; }
+    .panel { background: var(--panel); border: 1px solid #2a3142; border-radius: 8px;
+      padding: 20px 24px; max-width: 640px; width: calc(100% - 32px); max-height: calc(100% - 32px); overflow: auto; }
+    h1 { margin: 0 0 8px; font-size: 22px; }
+    h2 { margin: 16px 0 8px; font-size: 15px; color: var(--accent); }
+    p { margin: 6px 0; color: var(--dim); line-height: 1.6; }
+    table { border-collapse: collapse; width: 100%; font-size: 13px; }
+    td { padding: 3px 6px; border-bottom: 1px solid #222838; }
+    td:first-child { color: var(--accent); white-space: nowrap; width: 1%; }
+    #start { cursor: pointer; }
+    #start .panel { text-align: center; }
+    .big { font-size: 16px; color: var(--text); margin-top: 16px; }
+    #help { background: transparent; pointer-events: none; justify-content: flex-start; align-items: flex-start; }
+    #help .panel { pointer-events: auto; margin: 16px; max-width: 360px; }
+    .grid { display: flex; flex-wrap: wrap; gap: 6px; }
+    .grid button { font: inherit; color: var(--text); background: #1c2230; border: 1px solid #2a3142;
+      border-left: 4px solid #555; border-radius: 4px; padding: 6px 10px; min-width: 96px; text-align: left; cursor: pointer; }
+    .grid button small { display: block; color: var(--dim); font-size: 11px; }
+    .grid button:hover { background: #252d3f; }
+    .grid button.selected { outline: 2px solid var(--accent); }
+  </style>
+</head>
+<body>
+  <div id="wrap"><canvas id="game"></canvas></div>
+
+  <div id="start" class="overlay">
+    <div class="panel">
+      <h1>TestPhysics 原型</h1>
+      <p>發射「網」展開物理場域，改寫區域內的重力與時間。</p>
+      <p>A/D 移動、Space 跳躍、滑鼠瞄準；左鍵空氣砲，右鍵與 Q/E/R/F 施放技能。</p>
+      <p class="big">點擊開始</p>
+    </div>
+  </div>
+
+  <div id="help" class="overlay" hidden>
+    <div class="panel">
+      <h2>操作</h2>
+      <table>
+        <tr><td>A / D</td><td>移動（重力朝側面時改用 W / S）</td></tr>
+        <tr><td>Space</td><td>跳躍</td></tr>
+        <tr><td>Shift</td><td>衝刺（空中一次）</td></tr>
+        <tr><td>左鍵</td><td>空氣砲（按住連射，有後座力）</td></tr>
+        <tr><td>右鍵 Q E R F</td><td>技能欄 1～5，對游標位置施放</td></tr>
+        <tr><td>X／中鍵</td><td>解除所有場域</td></tr>
+        <tr><td>Tab</td><td>裝備選單（暫停）</td></tr>
+        <tr><td>Esc</td><td>暫停</td></tr>
+      </table>
+      <h2>除錯</h2>
+      <table>
+        <tr><td>1～9</td><td>把技能直接放到右鍵</td></tr>
+        <tr><td>[ / ]</td><td>上一個／下一個房間</td></tr>
+        <tr><td>T</td><td>重置房間</td></tr>
+        <tr><td>G</td><td>顯示碰撞框與數值</td></tr>
+        <tr><td>M</td><td>整體慢動作</td></tr>
+        <tr><td>H</td><td>開關這個說明</td></tr>
+      </table>
+      <p>右上角的「除錯參數」面板可以即時調整數值。</p>
+    </div>
+  </div>
+
+  <div id="loadout" class="overlay" hidden>
+    <div class="panel">
+      <h1>裝備</h1>
+      <p>先點選技能欄，再點選要放進去的技能。Tab 或 Esc 關閉。</p>
+      <h2>技能欄</h2>
+      <div id="loadout-slots" class="grid"></div>
+      <h2>已解鎖的技能</h2>
+      <div id="loadout-skills" class="grid"></div>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
