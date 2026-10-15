@@ -168,6 +168,10 @@ export class Body {
     return this.y > VIEW_H + 48 || this.y + this.h < -48 || this.x > VIEW_W + 48;
   }
 
+  touchingLava(world, inset = 3) {
+    return world.map.rectLava(this.x + inset, this.y + inset, this.w - inset * 2, this.h - inset * 2);
+  }
+
   touchingSpikes(world, inset = 2) {
     return world.map.rectSpikes(this.x + inset, this.y + inset, this.w - inset * 2, this.h - inset * 2);
   }

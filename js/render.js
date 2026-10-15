@@ -71,6 +71,7 @@ export class Renderer {
     this.drawJammerRanges(world);
     for (const e of world.entities) this.drawEntity(world, e);
     this.drawPlayer(world);
+    this.drawSteam(world);
     this.drawBeams(world);
     this.drawProjectiles(world);
     this.drawParticles(world);
@@ -115,6 +116,15 @@ export class Renderer {
           ctx.fillRect(x + 2, y + 2, 5, 2);
           ctx.strokeStyle = '#8cc8e8';
           ctx.strokeRect(x + 0.5, y + 0.5, TILE - 1, TILE - 1);
+        } else if (c === 'Z') {
+          // 熔岩：橘紅色，表面有流動的亮紋
+          ctx.fillStyle = '#c4361b';
+          ctx.fillRect(x, y, TILE, TILE);
+          ctx.fillStyle = '#ff8a3d';
+          const wave = Math.sin(world.time * 3 + tx) * 2;
+          ctx.fillRect(x, y + 3 + wave, TILE, 2);
+          ctx.fillStyle = 'rgba(255,210,120,0.8)';
+          ctx.fillRect(x + ((world.time * 10 + tx * 7) % TILE), y + 8, 3, 2);
         } else if (c === '^') {
           this.drawSpike(x, y, map.isSolid(tx, ty - 1) && !map.isSolid(tx, ty + 1));
         } else if (c === '|' && cfg.showHitboxes) {
@@ -155,6 +165,30 @@ export class Renderer {
         }
       }
     }
+  }
+
+  // 蒸氣：半透明的白色雲團，濃度越高越不透明（超過擋光門檻時明顯變濃）
+  drawSteam(world) {
+    const ctx = this.ctx;
+    const w = world.water;
+    for (let ty = 0; ty < ROWS; ty++) {
+      for (let tx = 0; tx < COLS; tx++) {
+        const s = w.steamAt(tx, ty);
+        if (s <= 0.02) continue;
+        const frozen = world.fields.sample(tx * TILE + 8, ty * TILE + 8).time < 0.05;
+        const t = world.time + tx * 1.7 + ty * 0.9;
+        ctx.globalAlpha = Math.min(0.75, s * (s > cfg.steamBlock ? 0.9 : 0.6));
+        ctx.fillStyle = frozen ? '#cfefff' : '#e8edf5';
+        for (let k = 0; k < 2; k++) {
+          const ox = frozen ? 0 : Math.sin(t * 1.3 + k * 2) * 3;
+          const oy = frozen ? 0 : Math.cos(t + k) * 2;
+          ctx.beginPath();
+          ctx.arc(tx * TILE + 5 + k * 6 + ox, ty * TILE + 8 + oy, 6 + s * 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+    ctx.globalAlpha = 1;
   }
 
   // 傳送門：貼在牆面上的發光線。只有一個門（沒有作用）時畫得比較淡；快消失時閃爍
@@ -238,7 +272,16 @@ export class Renderer {
     if (doors.length && !world.map.doorOpen) {
       const mid = doors[Math.floor(doors.length / 2)];
       if (hasLock) this.drawLock(mid.tx * TILE + 8, mid.ty * TILE + 8, C.key);
-      else if (world.switches.some((s) => s.kind === 'light')) {
+      else if (world.switches.some((s) => s.kind === 'steam')) {
+        ctx.strokeStyle = '#ffd34d';
+        ctx.beginPath();
+        for (let k = 0; k < 3; k++) {
+          const a = (k / 3) * Math.PI * 2;
+          ctx.moveTo(mid.tx * TILE + 8, mid.ty * TILE + 8);
+          ctx.lineTo(mid.tx * TILE + 8 + Math.cos(a) * 4, mid.ty * TILE + 8 + Math.sin(a) * 4);
+        }
+        ctx.stroke();
+      } else if (world.switches.some((s) => s.kind === 'light')) {
         ctx.fillStyle = '#7ff3ff';
         ctx.beginPath();
         ctx.arc(mid.tx * TILE + 8, mid.ty * TILE + 8, 3.5, 0, Math.PI * 2);
@@ -249,6 +292,22 @@ export class Renderer {
     for (const s of world.switches) {
       const x = s.tx * TILE;
       const y = s.ty * TILE;
+      if (s.kind === 'steam') {
+        // 蒸氣渦輪：蒸氣越多轉得越快，啟動時發亮
+        ctx.fillStyle = '#2a2f3c';
+        ctx.fillRect(x, y, TILE, TILE);
+        ctx.strokeStyle = s.pressed ? '#ffd34d' : '#9aa7bd';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let k = 0; k < 3; k++) {
+          const a = s.spin + (k / 3) * Math.PI * 2;
+          ctx.moveTo(x + 8, y + 8);
+          ctx.lineTo(x + 8 + Math.cos(a) * 6, y + 8 + Math.sin(a) * 6);
+        }
+        ctx.stroke();
+        ctx.lineWidth = 1;
+        continue;
+      }
       if (s.kind === 'light') {
         // 光線接收器：被照到時發亮
         ctx.fillStyle = '#2a2f3c';
@@ -371,6 +430,31 @@ export class Renderer {
 
   drawEntity(world, e) {
     const ctx = this.ctx;
+    if (e.isHeater) {
+      // 火爐：範圍＋發紅的爐口
+      ctx.strokeStyle = 'rgba(255,140,60,0.35)';
+      ctx.setLineDash([2, 4]);
+      ctx.beginPath();
+      ctx.arc(e.cx, e.cy, cfg.heatRadius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#3b2a24';
+      ctx.fillRect(e.x, e.y, e.w, e.h);
+      ctx.fillStyle = `rgba(255,${Math.round(110 + Math.sin(world.time * 6) * 30)},40,1)`;
+      ctx.fillRect(e.x + 3, e.y + 4, e.w - 6, 3);
+      ctx.fillRect(e.x + 3, e.y + 9, e.w - 6, 3);
+      return;
+    }
+    if (e.isSteamPlatform) {
+      ctx.fillStyle = '#7d8799';
+      ctx.fillRect(e.x, e.y, e.w, e.h);
+      ctx.fillStyle = '#2a2f3c';
+      for (let x = e.x + 4; x < e.x + e.w - 2; x += 8) ctx.fillRect(x, e.y + 3, 4, 2);
+      ctx.fillStyle = '#c9d2e0';
+      ctx.fillRect(e.x, e.y, e.w, 1);
+      this.timeTint(e);
+      return;
+    }
     if (e.isCooler) {
       // 冷凍裝置：雪花＋範圍
       ctx.strokeStyle = 'rgba(200,240,255,0.35)';

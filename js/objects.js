@@ -1,5 +1,5 @@
 import { cfg, TILE } from './config.js';
-import { Body, rectsOverlap } from './body.js';
+import { Body, rectsOverlap, approach } from './body.js';
 
 // 可以推的箱子。key = true 時是鑰匙箱，只有它能啟動鎖開關。
 export class Box extends Body {
@@ -32,6 +32,12 @@ export class Box extends Body {
     this.pushV = 0;
     this.checkGrounded(world);
     if (this.isOutOfBounds()) this.alive = false;
+    // 掉進熔岩：冰塊融化成水，其他箱子燒毀
+    if (this.alive && this.touchingLava(world)) {
+      this.alive = false;
+      if (this.isIce) world.water.add(Math.floor(this.cx / TILE), Math.floor(this.y / TILE), 1);
+      world.burst(this.cx, this.cy, this.isIce ? '#9fd8ff' : '#ff8a3d', 14);
+    }
   }
 
   // 時停中被打到時，速度會先累積，時間恢復後才一次釋放
@@ -216,6 +222,79 @@ export class Cooler {
   update() {}
 }
 
+// 火爐：範圍內的水沸騰成蒸氣、冰融化。固定、實心
+export class Heater {
+  constructor(tx, ty) {
+    this.x = tx * TILE;
+    this.y = ty * TILE;
+    this.w = TILE;
+    this.h = TILE;
+    this.isHeater = true;
+    this.solid = true;
+    this.alive = true;
+  }
+
+  get cx() { return this.x + this.w / 2; }
+  get cy() { return this.y + this.h / 2; }
+
+  update() {}
+}
+
+// 蒸氣浮台：自己和下方一格有蒸氣時被推上去，沒有蒸氣時落下；會載著站在上面的東西一起移動。
+// 一般的物體和玩家都不會被蒸氣推動，只有這種平台會
+export class SteamPlatform {
+  constructor(tx, ty, widthTiles) {
+    this.x = tx * TILE;
+    this.y = ty * TILE;
+    this.w = widthTiles * TILE;
+    this.h = 8;
+    this.vy = 0;
+    this.solid = true;
+    this.alive = true;
+    this.isSteamPlatform = true;
+    this.time = 1;
+  }
+
+  get cx() { return this.x + this.w / 2; }
+  get cy() { return this.y + this.h / 2; }
+
+  update(world, dt) {
+    this.time = world.fields.sample(this.cx, this.cy).time;
+    const ldt = dt * this.time;
+    if (ldt <= 0) return;
+    this.steam = world.water.steamInRect(this.x, this.y, this.w, this.h + TILE);
+    if (this.steam > 0.15) {
+      const target = -cfg.steamLift * Math.min(1, this.steam / 0.5);
+      this.vy = approach(this.vy, target, 300 * ldt);
+    } else {
+      this.vy = Math.min(this.vy + cfg.gravity * 0.5 * ldt, 240);
+    }
+
+    const riders = world.bodies().filter(
+      (b) => Math.abs(b.y + b.h - this.y) < 1.5 && b.x < this.x + this.w && b.x + b.w > this.x,
+    );
+    let dy = this.vy * ldt;
+    // 往上時先移動上面的東西；有東西被天花板擋住時，平台也跟著停下，不會把它擠進天花板
+    if (dy < 0) {
+      for (const r of riders) {
+        const y0 = r.y;
+        r.moveAxis(world, 'y', dy);
+        dy = Math.max(dy, r.y - y0);
+      }
+      if (dy > -0.01) { dy = 0; this.vy = 0; }
+    }
+    const before = this.y;
+    const step = Math.sign(dy);
+    for (let rem = Math.abs(dy); rem > 0; rem -= 1) {
+      const d = step * Math.min(1, rem);
+      if (world.map.rectSolid(this.x, this.y + d, this.w, this.h)) { this.vy = 0; break; }
+      this.y += d;
+    }
+    const moved = this.y - before;
+    if (dy > 0) for (const r of riders) r.moveAxis(world, 'y', moved);
+  }
+}
+
 // 可移動的干擾裝置：和箱子一樣可以推、會被空氣砲推動，也會受其他顏色的場域影響
 // （例如重力干擾器可以被時停，但重力場域在它身邊沒有作用）
 export class MovableJammer extends Box {
@@ -286,11 +365,13 @@ export class Switch {
     this.kind = kind;
     this.pressed = false;
     this.lit = false;
-    if (kind === 'light') {
+    if (kind === 'light' || kind === 'steam') {
       this.x = tx * TILE;
       this.y = ty * TILE;
       this.w = TILE;
       this.h = TILE;
+      this.spin = 0;
+      this.holdT = 0;
       return;
     }
     this.x = tx * TILE + 1;
@@ -299,7 +380,15 @@ export class Switch {
     this.h = 4;
   }
 
-  update(world) {
+  update(world, dt = 1 / 60) {
+    if (this.kind === 'steam') {
+      // 蒸氣渦輪：有蒸氣時轉動；啟動過一次就保持啟動（和光線接收器一樣，避免蒸氣散掉後門又關上）
+      // 只計算自己這一列和下方一列（左右各多一格）：從下方冒上來的蒸氣才算，上方飄過來的不算
+      const s = world.water.steamInRect(this.x - TILE, this.y, TILE * 3, TILE * 2);
+      this.spin += (s + (this.pressed ? 0.1 : 0)) * dt * 20;
+      if (s > 0.1) this.pressed = true;
+      return;
+    }
     if (this.kind === 'light') {
       // 被照亮過一次就保持啟動，避免玩家走過去時不小心推開鏡子，門又關上
       if (this.lit) this.pressed = true;

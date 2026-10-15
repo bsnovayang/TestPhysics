@@ -70,6 +70,13 @@ export const cfg = {
   swimSpeed: 140,            // 在水中按跳躍時往上游的速度
   swimCooldown: 0.25,
   iceFriction: 0.12,         // 冰面上的抓地力（倍率）
+  heatRadius: 40,            // 火爐的範圍
+  boilTime: 1,               // 水被加熱多久開始沸騰
+  boilRate: 0.3,             // 沸騰時每秒有多少水變成蒸氣（熔岩是 3 倍）
+  steamRise: 0.25,           // 蒸氣每一步往上飄的比例
+  steamCondense: 0.12,       // 蒸氣每秒凝結回水的比例（冷凍裝置附近更快）
+  steamBlock: 0.3,           // 蒸氣濃度超過這個值就會擋住光線
+  steamLift: 70,             // 蒸氣浮台被推上去的最高速度
 
   // 空氣砲
   cannonRate: 4,         // 每秒發數

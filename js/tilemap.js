@@ -6,6 +6,7 @@ import { TILE, COLS, ROWS } from './config.js';
 //   D  門（關閉時實心）
 //   |  移動平台的折返標記（只對平台有效，其他物體可以穿過）
 //   I  冰牆格（實心、很滑；被光照到會融化，水遇冷會結成冰牆格）
+//   Z  熔岩（不實心，碰到會受傷；讓相鄰的水沸騰、冰融化）
 export class TileMap {
   constructor(rows) {
     // 存成字元陣列，讓冰可以在遊戲中出現或消失
@@ -52,6 +53,10 @@ export class TileMap {
 
   rectSpikes(x, y, w, h) {
     return this.anyTileInRect(x, y, w, h, (tx, ty) => this.get(tx, ty) === '^');
+  }
+
+  rectLava(x, y, w, h) {
+    return this.anyTileInRect(x, y, w, h, (tx, ty) => this.get(tx, ty) === 'Z');
   }
 
   rectPlatformStop(x, y, w, h) {

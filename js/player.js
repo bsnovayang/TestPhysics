@@ -193,7 +193,7 @@ export class Player extends Body {
       world.hurtPlayer(2, { respawn: true });
       return;
     }
-    if (this.touchingSpikes(world, 3)) {
+    if (this.touchingSpikes(world, 3) || this.touchingLava(world)) {
       world.hurtPlayer(2, { respawn: true });
     }
   }

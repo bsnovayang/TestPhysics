@@ -6,7 +6,7 @@ import { PortalSystem } from './portals.js';
 import { rectsOverlap, impactDamage } from './body.js';
 import { Player } from './player.js';
 import { Web } from './projectiles.js';
-import { Box, BoxSpawner, MovingPlatform, Blade, Crusher, Switch, FixedJammer, MovableJammer, IceBlock, Cooler } from './objects.js';
+import { Box, BoxSpawner, MovingPlatform, Blade, Crusher, Switch, FixedJammer, MovableJammer, IceBlock, Cooler, Heater, SteamPlatform } from './objects.js';
 import { WaterSystem } from './water.js';
 import { Walker, Heavy, Jumper, Flyer, Turret, LaserEnemy } from './enemies.js';
 import { Emitter, MirrorBox } from './light.js';
@@ -15,7 +15,7 @@ import { Emitter, MirrorBox } from './light.js';
 const JAMMER_KINDS = ['gravity', 'time', 'space', 'all'];
 import { ROOMS } from './rooms.js';
 
-const KEEP_IN_MAP = new Set(['#', '^', 'D', '|', 'I']);
+const KEEP_IN_MAP = new Set(['#', '^', 'D', '|', 'I', 'Z']);
 
 function parseRoom(def) {
   const rows = def.map.map((r) => r.padEnd(COLS, ' ').slice(0, COLS));
@@ -40,6 +40,8 @@ function parseRoom(def) {
         case '%': grid[ty][tx] = '^'; water.push({ tx, ty }); continue; // 泡在水裡的尖刺
         case 'Y': entities.push(new IceBlock(tx, ty)); break;
         case 'C': entities.push(new Cooler(tx, ty)); break;
+        case 'H': entities.push(new Heater(tx, ty)); grid[ty][tx] = '#'; continue; // 火爐嵌在牆裡，水不會從它的位置漏出去
+        case 'W': switches.push(new Switch(tx, ty, 'steam')); break;
         case 'X': entities.push(new Emitter(tx, ty)); break;
         case 'R': switches.push(new Switch(tx, ty, 'light')); break;
         case 'l': entities.push(new LaserEnemy(tx, ty)); break;
@@ -58,11 +60,12 @@ function parseRoom(def) {
         case 'f': entities.push(new Flyer(tx, ty)); break;
         case 'T': entities.push(new Turret(tx, ty)); break;
         case 'V':
+        case 'U':
         case '=': {
           // 連續的同一個字元合成一個物件
           let n = 0;
           while (grid[ty][tx + n] === c) { grid[ty][tx + n] = ' '; n++; }
-          entities.push(c === 'V' ? new Crusher(tx, ty, n) : new MovingPlatform(tx, ty, n));
+          entities.push(c === 'V' ? new Crusher(tx, ty, n) : c === 'U' ? new SteamPlatform(tx, ty, n) : new MovingPlatform(tx, ty, n));
           continue;
         }
         default:

@@ -34,7 +34,7 @@ class Enemy extends Body {
       this.think(world, ldt);
       this.physics(world, ldt);
     }
-    if (this.touchingSpikes(world) || this.isOutOfBounds()) {
+    if (this.touchingSpikes(world) || this.touchingLava(world) || this.isOutOfBounds()) {
       this.die(world);
       return;
     }
@@ -177,8 +177,8 @@ export class LaserEnemy extends Walker {
         return;
       case 'fire': {
         this.applyFriction(600 * ldt);
-        const hit = this.emit(world, 'laser');
-        applyBeamHit(world, hit, cfg.laserDamage, this.cx);
+        const beam = this.emit(world, 'laser');
+        applyBeamHit(world, beam.hit, cfg.laserDamage, this.cx, beam.heats);
         if (this.timer >= cfg.laserFire) { this.state = 'patrol'; this.timer = 0; }
       }
     }
@@ -195,7 +195,7 @@ export class LaserEnemy extends Walker {
     const beam = traceBeam(world, e.x + this.aim.x * 8, e.y + this.aim.y * 8, this.aim.x, this.aim.y, this);
     const locked = kind === 'telegraph' && this.timer >= cfg.laserCharge - cfg.laserLock;
     world.beams.push({ segments: beam.segments, kind: locked ? 'locked' : kind });
-    return beam.hit;
+    return beam;
   }
 }
 

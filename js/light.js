@@ -37,6 +37,7 @@ export function traceBeam(world, x, y, dx, dy, source = null, hitsPlayer = true)
   let lastMirror = null;
   let hit = { type: 'none' };
   let bendSteps = 0;
+  const heats = []; // 被這道光加熱的水格（只加熱光線經過的第一個水格）
 
   for (let len = 0; len < MAX_LENGTH; len += RAY_STEP) {
     const nx = x + d.x * RAY_STEP;
@@ -64,6 +65,16 @@ export function traceBeam(world, x, y, dx, dy, source = null, hitsPlayer = true)
       const ty = Math.floor(ny / TILE);
       hit = world.map.get(tx, ty) === 'I' ? { type: 'ice', tx, ty } : { type: 'wall' };
       break;
+    }
+
+    // 濃的蒸氣會擋住光線（可以當成擋雷射的煙幕）
+    if (world.water.pointSteam(nx, ny) > cfg.steamBlock) {
+      cur.push({ x: nx, y: ny });
+      hit = { type: 'steam' };
+      break;
+    }
+    if (!heats.length && world.water.pointInWater(nx, ny)) {
+      heats.push({ tx: Math.floor(nx / TILE), ty: Math.floor(ny / TILE) });
     }
 
     // 物件：鏡子反射、敵人受擊、其他實心物體擋住
@@ -145,7 +156,7 @@ export function traceBeam(world, x, y, dx, dy, source = null, hitsPlayer = true)
     y = ny;
   }
   if (hit.type === 'none') cur.push({ x, y });
-  return { segments, hit };
+  return { segments, hit, heats };
 }
 
 // 雷射發射器：固定在牆上，朝遠離牆的方向持續發光。預設無害，用來解謎
@@ -175,7 +186,7 @@ export class Emitter {
     const sy = this.cy + this.dir.y * 9;
     const beam = traceBeam(world, sx, sy, this.dir.x, this.dir.y, this, cfg.emitterDamage > 0);
     world.beams.push({ segments: beam.segments, kind: 'emitter' });
-    applyBeamHit(world, beam.hit, cfg.emitterDamage, this.cx);
+    applyBeamHit(world, beam.hit, cfg.emitterDamage, this.cx, beam.heats);
   }
 }
 
@@ -193,8 +204,9 @@ export class MirrorBox extends Box {
   }
 }
 
-// 光線擊中時的效果。damage 為 0 時無害（只用於點亮接收器）
-export function applyBeamHit(world, hit, damage, fromX) {
+// 光線擊中時的效果。damage 為 0 時無害（只用於點亮接收器、融冰、煮水）
+export function applyBeamHit(world, hit, damage, fromX, heats = []) {
+  for (const h of heats) world.water.heatWater(h.tx, h.ty, STEP);
   if (hit.type === 'receiver') hit.entity.lit = true;
   // 光照到冰會升溫，持續約 1 秒就融化（不管光有沒有傷害）
   if (hit.type === 'ice') {
