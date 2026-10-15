@@ -4,6 +4,7 @@ import { World } from './world.js';
 import { Renderer } from './render.js';
 import { SKILLS, SKILL_ORDER, DEBUG_KEYS, TREE_COLORS } from './skills.js';
 import { createDebugPanel } from './debug.js';
+import { ROOMS } from './rooms.js';
 
 // 水的版本：?water=particle（粒子版）、?water=fx（原版＋粒子特效）、?water=pixel（Noita 風像素水），預設為原版（格子水）
 const WATER_VERSIONS = {
@@ -23,19 +24,21 @@ const world = new World(input, { createWater: waterModule.createWater });
 if (waterModule.createFx) renderer.fx = waterModule.createFx();
 renderer.versionLabel = WATER_VERSIONS[waterMode].name;
 buildVersionLinks();
+buildLevelGrid(document.getElementById('levels-start'));
 window.world = world; // 方便在主控台除錯
 
 const overlays = {
   start: document.getElementById('start'),
   help: document.getElementById('help'),
   loadout: document.getElementById('loadout'),
+  levels: document.getElementById('levels'),
 };
 let started = false;
 let paused = false;
 let slowMo = false;
 
 function isPaused() {
-  return !started || paused || !overlays.loadout.hidden;
+  return !started || paused || !overlays.loadout.hidden || !overlays.levels.hidden;
 }
 
 overlays.start.addEventListener('click', () => {
@@ -91,8 +94,12 @@ input.onKey((code) => {
       toggleLoadout();
       break;
     case 'Escape':
-      if (!overlays.loadout.hidden) toggleLoadout(false);
+      if (!overlays.levels.hidden) toggleLevels(false);
+      else if (!overlays.loadout.hidden) toggleLoadout(false);
       else { paused = !paused; overlays.help.hidden = !paused; }
+      break;
+    case 'KeyL':
+      toggleLevels();
       break;
     case 'KeyH':
       overlays.help.hidden = !overlays.help.hidden;
@@ -135,6 +142,34 @@ input.onKey((code) => {
     }
   }
 });
+
+// 選關：一排 10 個（CSS grid），滿了自動換行；點一下就進入那一關
+function buildLevelGrid(box) {
+  if (!box) return;
+  box.innerHTML = '';
+  ROOMS.forEach((room, i) => {
+    const [letter, ...rest] = room.name.split(' ');
+    const btn = document.createElement('button');
+    btn.innerHTML = '<b>' + letter + '</b><small>' + rest.join(' ') + '</small>';
+    btn.title = room.name;
+    if (i === world.roomIndex) btn.className = 'current';
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation(); // 開始畫面點任何地方都會開始遊戲，這裡要先攔下來
+      world.player.hp = cfg.hp;
+      world.player.mp = cfg.mpMax;
+      world.loadRoom(i);
+      started = true;
+      overlays.start.hidden = true;
+      toggleLevels(false);
+    });
+    box.appendChild(btn);
+  });
+}
+
+function toggleLevels(show = overlays.levels.hidden) {
+  overlays.levels.hidden = !show;
+  if (show) buildLevelGrid(document.getElementById('levels-menu'));
+}
 
 // 開始畫面的版本切換連結（保留其他網址參數）
 function buildVersionLinks() {
