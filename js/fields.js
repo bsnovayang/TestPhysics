@@ -3,16 +3,18 @@ import { SKILLS } from './skills.js';
 
 export class Field {
   // target：附著的對象（玩家、箱子、敵人）。有附著對象時，場域會跟著它移動
-  constructor(x, y, skillId, dir, target = null) {
+  // channel：維持中的按鍵代碼（自身附著）。維持型場域沒有時間限制，放開按鍵或 MP 耗盡時結束
+  constructor(x, y, skillId, dir, target = null, channel = null) {
     this.x = x;
     this.y = y;
     this.target = target;
+    this.channel = channel;
     this.r = cfg.fieldRadius;
     this.skillId = skillId;
     this.skill = SKILLS[skillId];
     this.dir = dir; // 定向重力的方向（單位向量）
     this.maxLife = cfg.fieldDuration;
-    this.life = this.maxLife;
+    this.life = channel ? Infinity : this.maxLife;
   }
 
   contains(x, y) {
@@ -31,9 +33,19 @@ export class FieldSystem {
     this.list.length = 0;
   }
 
+  // 維持型場域不佔用場上數量上限，也不會被新的場域擠掉
   add(field) {
     this.list.push(field);
-    while (this.list.length > cfg.maxFields) this.list.shift();
+    const placed = () => this.list.filter((f) => !f.channel);
+    while (placed().length > cfg.maxFields) this.list.splice(this.list.indexOf(placed()[0]), 1);
+  }
+
+  remove(field) {
+    this.list = this.list.filter((f) => f !== field);
+  }
+
+  get channeling() {
+    return this.list.some((f) => f.channel);
   }
 
   // 場域的持續時間用真實時間計算，不受時間場域影響

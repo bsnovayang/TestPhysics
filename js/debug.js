@@ -32,6 +32,8 @@ export async function createDebugPanel() {
   field.add(cfg, 'maxFields', 1, 6, 1).name('最多數量');
   field.add(cfg, 'mpCostRatio', 0, 0.5, 0.01).name('MP 消耗比例');
   field.add(cfg, 'mpRegen', 0, 30, 0.5).name('MP 回復／秒');
+  field.add(cfg, 'selfAttachUnlocked').name('自身附著已解鎖');
+  field.add(cfg, 'selfDrain', 0, 100, 1).name('自身附著 MP／秒');
   field.add(cfg, 'webRange', 32, 400, 4).name('網的射程');
   field.add(cfg, 'webSpeed', 100, 1200, 20).name('網的速度');
 

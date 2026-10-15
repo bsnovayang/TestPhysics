@@ -449,11 +449,16 @@ export class Renderer {
       ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
       ctx.stroke();
       ctx.setLineDash([]);
-      // 剩餘時間
-      ctx.globalAlpha = 0.95;
+      // 剩餘時間；維持型場域沒有時間限制，改用閃爍的完整外圈表示
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(f.x, f.y, f.r + 2, -Math.PI / 2, -Math.PI / 2 + (f.life / f.maxLife) * Math.PI * 2);
+      if (f.channel) {
+        ctx.globalAlpha = 0.6 + Math.sin(world.time * 12) * 0.3;
+        ctx.arc(f.x, f.y, f.r + 2, 0, Math.PI * 2);
+      } else {
+        ctx.globalAlpha = 0.95;
+        ctx.arc(f.x, f.y, f.r + 2, -Math.PI / 2, -Math.PI / 2 + (f.life / f.maxLife) * Math.PI * 2);
+      }
       ctx.stroke();
       ctx.lineWidth = 1;
       ctx.globalAlpha = 1;
@@ -587,7 +592,8 @@ export class Renderer {
     ctx.fillText('MP', 8, 25);
     ctx.fillStyle = '#3a3f4b';
     ctx.fillRect(24, 21, 100, 8);
-    ctx.fillStyle = '#4aa8ff';
+    // 維持自身附著時，MP 條改成閃爍的黃色，提醒正在持續消耗
+    ctx.fillStyle = world.fields.channeling && Math.floor(world.time * 8) % 2 ? '#ffd34d' : '#4aa8ff';
     ctx.fillRect(24, 21, (p.mp / cfg.mpMax) * 100, 8);
     const cost = cfg.mpMax * cfg.mpCostRatio;
     ctx.fillStyle = 'rgba(0,0,0,0.5)';

@@ -121,7 +121,7 @@ export class Player extends Body {
     this.invT -= dt;
     this.hasteT -= dt;
     this.cannonCd -= dt;
-    this.mp = Math.min(cfg.mpMax, this.mp + cfg.mpRegen * dt);
+    if (!world.fields.channeling) this.mp = Math.min(cfg.mpMax, this.mp + cfg.mpRegen * dt);
 
     this.handleActions(world);
     this.checkHazards(world);
@@ -159,7 +159,7 @@ export class Player extends Body {
 
     // 技能欄
     SLOT_KEYS.forEach((slot, i) => {
-      if (input.wasPressed(slot.code)) world.castSkill(i);
+      if (input.wasPressed(slot.code)) world.castSkill(i, slot.code);
     });
 
     // 解除所有場域

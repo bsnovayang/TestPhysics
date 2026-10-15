@@ -122,12 +122,17 @@ export class World {
     return null;
   }
 
-  castSkill(slot) {
+  castSkill(slot, keyCode) {
     const id = this.loadout[slot];
     if (!id) return;
     const skill = SKILLS[id];
     const cost = cfg.mpMax * cfg.mpCostRatio;
     const p = this.player;
+    const selfCast = !skill.self && this.isSelfCast();
+    if (selfCast && !cfg.selfAttachUnlocked) {
+      this.toast('尚未解鎖自身附著');
+      return;
+    }
     if (p.mp < cost) {
       this.toast('MP 不足');
       return;
@@ -148,12 +153,29 @@ export class World {
     // 游標太靠近自己時（例如對自己施放定向重力），方向改用面向
     const dir = d > 8 ? { x: dx / d, y: dy / d } : { x: p.facing, y: 0 };
 
-    if (this.isSelfCast()) {
-      this.fields.add(new Field(p.cx, p.cy, id, dir, p));
+    if (selfCast) {
+      this.fields.add(new Field(p.cx, p.cy, id, dir, p, keyCode));
       this.burst(p.cx, p.cy, '#ffffff', 10);
       return;
     }
     this.projectiles.push(new Web(o.x, o.y, end.x, end.y, id, dir));
+  }
+
+  // 維持型場域：放開按鍵或 MP 耗盡時結束
+  updateChannels(dt) {
+    const p = this.player;
+    for (const f of this.fields.list.filter((f) => f.channel)) {
+      if (!this.input.isDown(f.channel)) {
+        this.fields.remove(f);
+        continue;
+      }
+      p.mp -= cfg.selfDrain * dt;
+      if (p.mp <= 0) {
+        p.mp = 0;
+        this.fields.remove(f);
+        this.toast('MP 耗盡');
+      }
+    }
   }
 
   // 對自己施放：游標指在自己身上，或按住 C
@@ -240,6 +262,7 @@ export class World {
     this.time += dt;
     this.fields.update(dt);
     this.player.update(this, dt);
+    this.updateChannels(dt);
 
     if (this.pendingRoom === null) {
       for (const e of this.entities) if (e.alive) e.update(this, dt);

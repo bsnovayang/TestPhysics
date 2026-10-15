@@ -38,6 +38,10 @@ export const cfg = {
   webSpeed: 480,
   webRange: 160,         // 約 10 格
 
+  // 自身附著：按住技能鍵維持，持續消耗 MP，維持期間 MP 不回復
+  selfAttachUnlocked: true, // 之後隨進度解鎖；原型預設開啟
+  selfDrain: 25,            // 每秒消耗的 MP（啟動時另外扣一次一般消耗）
+
   // 空氣砲
   cannonRate: 4,         // 每秒發數
   cannonSpeed: 420,
