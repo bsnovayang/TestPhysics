@@ -123,6 +123,14 @@ input.onKey((code) => {
   }
 });
 
+// 除錯：按住 B 在游標位置噴蒸氣、按住 N 倒水
+function debugSpawn() {
+  const tx = Math.floor(world.mouse.x / 16);
+  const ty = Math.floor(world.mouse.y / 16);
+  if (input.isDown('KeyB')) world.water.addSteam(tx, ty, 0.2);
+  if (input.isDown('KeyN')) world.water.add(tx, ty, 0.1);
+}
+
 // ---- 主迴圈（固定時間步長）----
 let last = performance.now();
 let acc = 0;
@@ -140,6 +148,7 @@ function frame(now) {
     acc += dt * cfg.globalTimeScale;
     let steps = 0;
     while (acc >= STEP && steps < 5) {
+      debugSpawn();
       world.update(STEP);
       input.endStep();
       acc -= STEP;

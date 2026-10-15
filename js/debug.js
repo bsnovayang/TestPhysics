@@ -60,6 +60,17 @@ export async function createDebugPanel() {
   light.add(cfg, 'laserLock', 0, 2, 0.05).name('鎖定秒數');
   light.add(cfg, 'emitterDamage', 0, 5, 1).name('發射器傷害');
 
+  const water = gui.addFolder('水與蒸氣（B 噴蒸氣、N 倒水）');
+  water.add(cfg, 'steamRise', 0, 0.5, 0.005).name('蒸氣上升速度');
+  water.add(cfg, 'steamWander', 0, 0.6, 0.01).name('蒸氣左右飄動');
+  water.add(cfg, 'steamSpread', 2, 40, 1).name('蒸氣集中程度');
+  water.add(cfg, 'steamCondense', 0, 0.5, 0.01).name('蒸氣凝結速度');
+  water.add(cfg, 'boilRate', 0, 2, 0.05).name('沸騰速度');
+  water.add(cfg, 'steamLift', 0, 150, 5).name('浮台上升速度');
+  water.add(cfg, 'steamBlock', 0.05, 1, 0.05).name('擋光濃度');
+  water.add(cfg, 'swimSpeed', 50, 300, 10).name('游泳速度');
+  water.add(cfg, 'waterDrag', 0, 10, 0.5).name('水中阻力');
+
   const impact = gui.addFolder('撞擊傷害');
   impact.add(cfg, 'impactThreshold', 50, 600, 10).name('速度門檻');
   impact.add(cfg, 'impactPerDamage', 20, 400, 10).name('每點傷害所需速度');

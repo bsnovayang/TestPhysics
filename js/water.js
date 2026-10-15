@@ -60,6 +60,11 @@ export class WaterSystem {
     return sum;
   }
 
+  // 除錯用：在某一格加入蒸氣
+  addSteam(tx, ty, s) {
+    if (this.inBounds(tx, ty) && !this.blocked(tx, ty)) this.steam[this.idx(tx, ty)] = Math.min(1, this.steam[this.idx(tx, ty)] + s);
+  }
+
   add(tx, ty, a) {
     if (this.inBounds(tx, ty) && !this.blocked(tx, ty)) this.amount[this.idx(tx, ty)] += a;
   }
@@ -152,7 +157,7 @@ export class WaterSystem {
         const i = this.idx(tx, ty);
         let s = S[i];
         if (s <= 0) continue;
-        if (s < 0.001) { this.dew[i] += s / STEAM_EXPANSION; S[i] = 0; this.releaseDew(i); continue; } // 太稀的蒸氣直接凝結
+        if (s < 0.0003) { this.dew[i] += s / STEAM_EXPANSION; S[i] = 0; this.releaseDew(i); continue; } // 太稀的蒸氣直接凝結
         if (this.blocked(tx, ty)) { S[i] = 0; continue; }
 
         const cx = tx * TILE + TILE / 2;
@@ -176,11 +181,24 @@ export class WaterSystem {
         if (down) {
           const up = { x: -down.x, y: -down.y };
           s -= this.flowInto(world, S, tx + up.x, ty + up.y, up, s * cfg.steamRise * rate);
-          if (s > 0.002) s -= this.spread(world, S, tx, ty, up, s, 4, rate);
+          if (s > 0.002) s -= this.spread(world, S, tx, ty, up, s, cfg.steamSpread, rate);
+          if (s > 0.01) s -= this.wander(tx, ty, up, s * cfg.steamWander * Math.random() * rate);
         }
         S[i] = s;
       }
     }
+  }
+
+  // 蒸氣隨機往左或右飄一點（重力朝側面時改成上下），讓蒸氣看起來在翻騰，往上的淨速度也會變慢
+  wander(tx, ty, up, amount) {
+    const side = Math.random() < 0.5 ? -1 : 1;
+    const nx = tx + (up.x === 0 ? side : 0);
+    const ny = ty + (up.x === 0 ? 0 : side);
+    if (!this.inBounds(nx, ny) || this.blocked(nx, ny)) return 0;
+    const j = this.idx(nx, ny);
+    const f = Math.min(amount, Math.max(0, 1 - this.steam[j]));
+    this.steam[j] += f;
+    return f;
   }
 
   // 凝結的水累積到一定量才變成水格裡的水（否則一點點的水會被當成空格清掉，水就不見了）
