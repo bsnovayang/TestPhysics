@@ -483,17 +483,20 @@ export class Renderer {
     const ctx = this.ctx;
     if (e.isLavaBlob) {
       // 飛行中的熔岩塊；被時停時畫成暗紅色並加框（可以站、不燙）
+      // 用 2 px 的小方塊組成（和熔岩池同樣的像素質感與顏色），四個角挖掉，看起來像一團熔岩
       const frozen = e.time < 0.05;
-      ctx.fillStyle = frozen ? '#6b2a1c' : '#ff6a2a';
-      ctx.beginPath();
-      ctx.arc(e.cx, e.cy, 4.5, 0, Math.PI * 2);
-      ctx.fill();
+      const seed = Math.floor(e.x * 7 + e.y * 13);
+      for (let py = 0; py < 4; py++) {
+        for (let px = 0; px < 4; px++) {
+          if ((px === 0 || px === 3) && (py === 0 || py === 3)) continue;
+          const n = (seed + px * 31 + py * 17) % 7;
+          ctx.fillStyle = frozen ? (n < 3 ? '#6b2a1c' : '#7a3322') : py === 0 ? '#ff9640' : n < 2 ? '#ffb347' : n < 5 ? '#d8441c' : '#c4361b';
+          ctx.fillRect(Math.round(e.x) + px * 2, Math.round(e.y) + py * 2, 2, 2);
+        }
+      }
       if (frozen) {
         ctx.strokeStyle = 'rgba(200,240,255,0.7)';
         ctx.strokeRect(e.x - 0.5, e.y - 0.5, e.w + 1, e.h + 1);
-      } else {
-        ctx.fillStyle = 'rgba(255,220,120,0.9)';
-        ctx.fillRect(e.cx - 1, e.cy - 2, 2, 2);
       }
       return;
     }
@@ -541,6 +544,15 @@ export class Renderer {
       ctx.fillStyle = e.on ? color : '#5a5f6b';
       const d = e.dir ?? { x: 0, y: 1 };
       ctx.fillRect(e.cx + d.x * 5 - 3, e.cy + d.y * 5 - 3, 6, 6);
+      // 開啟時畫出流出去的液柱：從出口往下，直到碰到地面或液面；關閉時就沒有，一眼看得出狀態
+      if (e.on) {
+        const sx = e.cx + d.x * 10;
+        let sy = e.cy + d.y * 10;
+        const y0 = sy;
+        while (sy < VIEW_H && !world.map.pointSolid(sx, sy) && !world.water.pointInWater(sx, sy) && !world.water.pointInLava(sx, sy)) sy += 2;
+        ctx.fillStyle = e.liquid === 'lava' ? 'rgba(255,120,40,0.85)' : 'rgba(90,160,255,0.7)';
+        for (let y = y0; y < sy; y += 2) ctx.fillRect(sx - 1 + (Math.floor(world.time * 20 + y / 2) % 3 === 0 ? 1 : 0), y, 2, 2);
+      }
       ctx.strokeStyle = color;
       ctx.strokeRect(e.x + 0.5, e.y + 0.5, e.w - 1, e.h - 1);
       return;

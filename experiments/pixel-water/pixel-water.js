@@ -112,7 +112,8 @@ export class PixelWaterSystem extends WaterSystem {
     if (!this.inBounds(tx, ty)) return 0;
     let n = Math.round(a * CELLS_PER_TILE);
     let taken = 0;
-    for (let y = 0; y < PER && n > 0; y++) for (let x = 0; x < PER && n > 0; x++) {
+    // 從下往上拿：表面保持完整，上面的熔岩會往下流補上
+    for (let y = PER - 1; y >= 0 && n > 0; y--) for (let x = 0; x < PER && n > 0; x++) {
       const i = this.fi(tx * PER + x, ty * PER + y);
       if (this.mat[i] === LAVA) { this.mat[i] = EMPTY; n--; taken++; }
     }

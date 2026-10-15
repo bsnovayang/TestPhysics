@@ -191,7 +191,8 @@ export class Vent {
     // 房間裡的熔岩比基準量多時，把周圍的熔岩吸回去（噴出來的熔岩最後會回到火山裡）
     const total = world.water.lava.reduce((a, b) => a + b, 0);
     if (total > world.lavaBaseline + 0.5) {
-      for (let dy = -2; dy <= 0; dy++) for (let dx = -3; dx <= 3; dx++) world.water.takeLava(this.tx + dx, this.ty + dy, cfg.ventDrain * ldt);
+      // 只從噴發口這一格和上方一格吸（周圍的熔岩會自己流過來補），畫面上比較不會出現破洞
+      for (const dy of [0, -1]) world.water.takeLava(this.tx, this.ty + dy, cfg.ventDrain * 6 * ldt);
     }
     // 上方被實心（例如石頭）封住：不會噴發
     this.blocked = world.map.isSolid(this.tx, this.ty - 1) || world.map.isSolid(this.tx, this.ty);
@@ -201,7 +202,8 @@ export class Vent {
         if (this.timer <= 0) { this.state = 'warn'; this.timer = cfg.ventWarn; }
         break;
       case 'warn':
-        if (Math.random() < 0.5) world.particles.push({ x: this.cx + (Math.random() - 0.5) * 12, y: this.y, vx: 0, vy: -30 - Math.random() * 40, life: 0.4, color: '#ff8a3d' });
+        // 預兆：細小的亮黃色火花往上飄（和真正噴出來、比較大塊的熔岩區分開；太暗的話在熔岩上看起來像破洞）
+        if (Math.random() < 0.3) world.particles.push({ x: this.cx + (Math.random() - 0.5) * 10, y: this.y + 2, vx: (Math.random() - 0.5) * 12, vy: -25 - Math.random() * 30, life: 0.45, color: '#ffd27a' });
         if (this.timer <= 0) {
           if (this.blocked) { this.state = 'idle'; this.timer = cfg.ventInterval; break; }
           this.state = 'erupt';
