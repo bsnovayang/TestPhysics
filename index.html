@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>TestPhysics 原型</title>
   <style>
+    /* 像素字型：Fusion Pixel 12px（OFL 授權，見 fonts/OFL-fusion-pixel.txt） */
+    @font-face { font-family: "FusionPixel"; src: url("fonts/fusion-pixel-12px-proportional-zh_tw.ttf.woff2") format("woff2"); font-display: block; }
     :root {
       --bg: #0d0f14;
       --panel: rgba(16, 19, 27, 0.94);
@@ -16,7 +18,7 @@
     html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
       font-family: "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif; overflow: hidden; }
     #wrap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
-    #game { display: block; cursor: none; }
+    #game { display: block; cursor: none; image-rendering: pixelated; }
     .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
       background: rgba(5, 6, 10, 0.6); z-index: 10; }
     .overlay[hidden] { display: none; }

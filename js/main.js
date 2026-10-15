@@ -21,6 +21,8 @@ const waterModule = WATER_VERSIONS[waterMode].module ? await import(WATER_VERSIO
 const canvas = document.getElementById('game');
 const input = new Input();
 input.attach(canvas);
+// 畫布上的文字要等像素字型載入完才會用到它
+await document.fonts.load('12px "FusionPixel"', '測試').catch(() => {});
 const renderer = new Renderer(canvas);
 const world = new World(input, { createWater: waterModule.createWater });
 if (waterModule.createFx) renderer.fx = waterModule.createFx();
@@ -54,7 +56,10 @@ if (params.has('autostart')) {
   started = true;
   overlays.start.hidden = true;
 }
-if (params.has('room')) world.loadRoom(Number(params.get('room')) - 1);
+if (params.has('room')) {
+  world.loadRoom(Number(params.get('room')) - 1);
+  world.toasts = world.toasts.slice(-1); // 只留新房間的名稱
+}
 
 // ---- 裝備選單 ----
 let selectedSlot = 0;

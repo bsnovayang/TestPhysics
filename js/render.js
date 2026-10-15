@@ -3,10 +3,13 @@ import { SKILLS, TREE_COLORS } from './skills.js';
 import { Box, BoxSpawner, MovingPlatform, Blade, Crusher } from './objects.js';
 import { Heavy, Jumper, Flyer, Turret, LaserEnemy } from './enemies.js';
 import { Emitter, MirrorBox } from './light.js';
+import { heroSprites, HERO_ANIMS, enemySprites, wallTile, wallTop, spikeTile, doorTile, crateSprite, noise } from './pixel/art.js';
 
 const JAMMER_COLORS = { ...TREE_COLORS, all: '#ffffff' };
 
-const FONT = '"Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif';
+// 像素字型（Fusion Pixel 12px，只用 12px 一種大小才會清楚）
+const FONT = '"FusionPixel", "Microsoft JhengHei", sans-serif';
+const TEXT = `12px ${FONT}`;
 const C = {
   bg: '#141821',
   bgGrid: '#1a1f2b',
@@ -31,22 +34,27 @@ const C = {
 export class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d');
+    this.out = canvas.getContext('2d');
+    // 整個遊戲畫在 640×360 的低解析度畫布上（1 世界像素 = 1 像素），最後整數倍放大
+    this.low = document.createElement('canvas');
+    this.low.width = VIEW_W;
+    this.low.height = VIEW_H;
+    this.ctx = this.low.getContext('2d');
     this.scale = 1;
     this.resize();
     window.addEventListener('resize', () => this.resize());
   }
 
+  // 以裝置像素算放大倍率：放得下 1 倍以上就取整數倍，每個像素大小一致；太小才用小數倍
   resize() {
     const dpr = window.devicePixelRatio || 1;
-    this.scale = Math.max(0.5, Math.min(window.innerWidth / VIEW_W, window.innerHeight / VIEW_H));
-    const cssW = Math.floor(VIEW_W * this.scale);
-    const cssH = Math.floor(VIEW_H * this.scale);
-    this.canvas.style.width = cssW + 'px';
-    this.canvas.style.height = cssH + 'px';
-    this.canvas.width = Math.floor(cssW * dpr);
-    this.canvas.height = Math.floor(cssH * dpr);
-    this.pixelScale = (cssW * dpr) / VIEW_W;
+    const fit = Math.min((window.innerWidth * dpr) / VIEW_W, (window.innerHeight * dpr) / VIEW_H);
+    const k = fit >= 1 ? Math.floor(fit) : Math.max(0.25, fit);
+    this.canvas.width = Math.round(VIEW_W * k);
+    this.canvas.height = Math.round(VIEW_H * k);
+    this.canvas.style.width = this.canvas.width / dpr + 'px';
+    this.canvas.style.height = this.canvas.height / dpr + 'px';
+    this.scale = k / dpr;
   }
 
   screenToGame(clientX, clientY) {
@@ -59,7 +67,8 @@ export class Renderer {
 
   draw(world) {
     const ctx = this.ctx;
-    ctx.setTransform(this.pixelScale, 0, 0, this.pixelScale, 0, 0);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.imageSmoothingEnabled = false;
     ctx.fillStyle = C.bg;
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
     this.drawGrid();
@@ -83,6 +92,9 @@ export class Renderer {
     if (cfg.showHitboxes) this.drawHitboxes(world);
     this.drawHud(world);
     this.drawCursor(world);
+    const out = this.out;
+    out.imageSmoothingEnabled = false;
+    out.drawImage(this.low, 0, 0, this.canvas.width, this.canvas.height);
   }
 
   drawGrid() {
@@ -104,12 +116,13 @@ export class Renderer {
         const x = tx * TILE;
         const y = ty * TILE;
         if (c === '#') {
-          ctx.fillStyle = C.tile;
-          ctx.fillRect(x, y, TILE, TILE);
-          if (!map.isSolid(tx, ty - 1)) {
-            ctx.fillStyle = C.tileTop;
-            ctx.fillRect(x, y, TILE, 3);
-          }
+          ctx.drawImage(wallTile(Math.floor(noise(tx, ty, 7) * 4)), x, y);
+          if (!map.isSolid(tx, ty - 1) && ty > 0) ctx.drawImage(wallTop(), x, y);
+          // 外露的左、右、下緣畫一條暗邊
+          ctx.fillStyle = '#262c3a';
+          if (tx > 0 && !map.isSolid(tx - 1, ty)) ctx.fillRect(x, y, 1, TILE);
+          if (tx < COLS - 1 && !map.isSolid(tx + 1, ty)) ctx.fillRect(x + TILE - 1, y, 1, TILE);
+          if (ty < ROWS - 1 && !map.isSolid(tx, ty + 1)) ctx.fillRect(x, y + TILE - 1, TILE, 1);
         } else if ((c === 'I' || c === 'Q') && world.water.drawsSolids) {
           // 像素版：冰和石頭由像素畫，這裡不畫整格
         } else if (c === 'I') {
@@ -269,6 +282,10 @@ export class Renderer {
   }
 
   drawSpike(x, y, pointDown) {
+    this.ctx.drawImage(spikeTile(pointDown), x, y);
+  }
+
+  drawSpikeVector(x, y, pointDown) {
     const ctx = this.ctx;
     ctx.fillStyle = C.spike;
     ctx.beginPath();
@@ -315,10 +332,7 @@ export class Renderer {
         ctx.strokeStyle = 'rgba(122,92,58,0.6)';
         ctx.strokeRect(x + 0.5, y + 0.5, TILE - 1, TILE - 1);
       } else {
-        ctx.fillStyle = C.door;
-        ctx.fillRect(x, y, TILE, TILE);
-        ctx.strokeStyle = '#5a4026';
-        ctx.strokeRect(x + 0.5, y + 0.5, TILE - 1, TILE - 1);
+        ctx.drawImage(doorTile(), x, y);
       }
     }
     // 門上的圖案畫在中間那一格
@@ -531,7 +545,7 @@ export class Renderer {
       ctx.fillRect(e.x + 5, e.y + 3, e.w - 10, 3);
       if (e.blocked) {
         ctx.fillStyle = '#7d869a';
-        ctx.font = `7px ${FONT}`;
+        ctx.font = TEXT;
         ctx.textAlign = 'center';
         ctx.fillText('封住', e.cx, e.y - 2);
         ctx.textAlign = 'left';
@@ -675,17 +689,9 @@ export class Renderer {
       return;
     }
     if (e instanceof Box) {
-      ctx.fillStyle = C.box;
-      ctx.fillRect(e.x, e.y, e.w, e.h);
-      ctx.strokeStyle = C.boxEdge;
-      ctx.strokeRect(e.x + 0.5, e.y + 0.5, e.w - 1, e.h - 1);
-      if (e.key) this.drawKey(e.cx, e.cy, C.key);
-      else {
-        ctx.beginPath();
-        ctx.moveTo(e.x + 3, e.y + 3); ctx.lineTo(e.x + e.w - 3, e.y + e.h - 3);
-        ctx.moveTo(e.x + e.w - 3, e.y + 3); ctx.lineTo(e.x + 3, e.y + e.h - 3);
-        ctx.stroke();
-      }
+      if (e.w === 16 && e.h === 16) ctx.drawImage(crateSprite('box'), Math.round(e.x), Math.round(e.y));
+      else ctx.drawImage(crateSprite('box'), Math.round(e.x), Math.round(e.y), e.w, e.h);
+      if (e.key) this.drawKey(Math.round(e.cx), Math.round(e.cy), C.key);
       this.timeTint(e);
     } else if (e instanceof MovingPlatform) {
       ctx.fillStyle = C.platform;
@@ -738,11 +744,18 @@ export class Renderer {
 
   drawEnemy(world, e) {
     const ctx = this.ctx;
-    ctx.fillStyle = e.flashT > 0 ? '#ffffff' : e.color;
-    ctx.fillRect(e.x, e.y, e.w, e.h);
     const up = e.groundAxis === 'y' && e.groundSign < 0;
-    const eyeY = up ? e.y + e.h - 5 : e.y + 3;
-    ctx.fillStyle = '#1b1b1b';
+    const kind = e instanceof LaserEnemy ? 'laser' : e instanceof Heavy ? 'heavy' : e instanceof Jumper ? 'jumper'
+      : e instanceof Flyer ? 'flyer' : e instanceof Turret ? 'turret' : 'walker';
+    const frames = enemySprites(kind);
+    const fr = frames[Math.floor(world.time * (kind === 'flyer' ? 10 : 5) + e.x * 0.01) % 2];
+    const img = e.flashT > 0 ? fr.flash : fr.canvas;
+    const dir = e.dir ?? (Math.sign(world.player.cx - e.cx) || 1);
+    ctx.save();
+    ctx.translate(Math.round(e.cx), Math.round(e.cy));
+    ctx.scale(dir < 0 ? -1 : 1, up ? -1 : 1);
+    ctx.drawImage(img, -Math.floor(img.width / 2), -Math.floor(img.height / 2));
+    ctx.restore();
 
     if (e instanceof Turret) {
       const p = world.player;
@@ -754,33 +767,16 @@ export class Renderer {
       ctx.lineTo(e.cx + Math.cos(a) * 11, e.cy + Math.sin(a) * 11);
       ctx.stroke();
       ctx.lineWidth = 1;
-    } else if (e instanceof Flyer) {
-      const flap = Math.sin(world.time * 20) * 3;
-      ctx.fillStyle = '#ffd1ef';
-      ctx.fillRect(e.x - 4, e.y + 2 + flap, 4, 3);
-      ctx.fillRect(e.x + e.w, e.y + 2 - flap, 4, 3);
-      ctx.fillStyle = '#1b1b1b';
-      ctx.fillRect(e.cx - 1, eyeY, 2, 2);
-    } else {
-      const dir = e.dir ?? (Math.sign(world.player.cx - e.cx) || 1);
-      ctx.fillRect(dir > 0 ? e.x + e.w - 5 : e.x + 3, eyeY, 2, 2);
     }
 
     if (e instanceof LaserEnemy) {
       // 眼睛：集氣時越來越亮
       const charge = e.state === 'charge' ? Math.min(1, e.timer / cfg.laserCharge) : e.state === 'fire' ? 1 : 0;
-      ctx.fillStyle = `rgba(255,${Math.round(220 - charge * 180)},${Math.round(240 - charge * 160)},1)`;
-      ctx.beginPath();
-      ctx.arc(e.eye.x, e.eye.y, 2 + charge * 2, 0, Math.PI * 2);
-      ctx.fill();
-    } else if (e instanceof Heavy) {
-      ctx.strokeStyle = '#ffd34d';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(e.x + 1, e.y + 1, e.w - 2, e.h - 2);
-      ctx.lineWidth = 1;
-    } else if (e instanceof Jumper) {
-      ctx.fillStyle = '#b8900b';
-      ctx.fillRect(e.x + 2, up ? e.y : e.y + e.h - 3, e.w - 4, 3);
+      if (charge > 0) {
+        ctx.fillStyle = `rgba(255,${Math.round(220 - charge * 180)},${Math.round(240 - charge * 160)},1)`;
+        const r = Math.round(1 + charge * 2);
+        ctx.fillRect(Math.round(e.eye.x) - r, Math.round(e.eye.y) - r, r * 2, r * 2);
+      }
     }
 
     // 血量
@@ -798,33 +794,44 @@ export class Renderer {
     const p = world.player;
     if (p.invT > 0 && Math.floor(world.time * 20) % 2 === 0) return;
 
-    // 頭的方向和重力相反
+    // 精靈：腳朝向重力方向（重力反轉就倒過來、側向重力就轉 90 度）
     const axis = p.groundAxis ?? 'y';
     const sign = p.groundAxis ? p.groundSign : 1;
-    ctx.fillStyle = C.player;
-    ctx.fillRect(p.x, p.y, p.w, p.h);
-    ctx.fillStyle = C.playerBand;
-    if (axis === 'y') {
-      const bandY = sign > 0 ? p.y + 6 : p.y + p.h - 8;
-      ctx.fillRect(p.x, bandY, p.w, 2);
-      const eyeY = sign > 0 ? p.y + 3 : p.y + p.h - 5;
-      ctx.fillStyle = '#1b2333';
-      ctx.fillRect(p.facing > 0 ? p.x + p.w - 4 : p.x + 2, eyeY, 2, 2);
-    } else {
-      const bandX = sign > 0 ? p.x + 2 : p.x + p.w - 4;
-      ctx.fillRect(bandX, p.y, 2, p.h);
-    }
+    const along = axis === 'y' ? p.vx : p.vy;
+    const across = (axis === 'y' ? p.vy : p.vx) * sign;
+    let anim = 'idle';
+    if (!p.grounded && p.groundAxis) anim = across < 0 ? 'jump' : 'fall';
+    else if (!p.groundAxis) anim = 'fall';
+    else if (Math.abs(along) > 10) anim = 'run';
+    const A = HERO_ANIMS[anim];
+    const pose = A.frames[Math.floor(world.time * A.fps) % A.frames.length];
+    const spr = heroSprites()[pose];
+    const img = p.stunT > 0 ? spr.flash : spr.canvas;
+    const rot = axis === 'y' ? (sign > 0 ? 0 : Math.PI) : sign > 0 ? -Math.PI / 2 : Math.PI / 2;
+    // 面向：畫面上的左右（倒立時精靈左右也會跟著反過來，所以要補回來）
+    const face = axis === 'y' ? p.facing * sign : p.facing;
+    ctx.save();
+    ctx.translate(Math.round(p.cx), Math.round(p.cy));
+    ctx.rotate(rot);
+    ctx.scale(face < 0 ? -1 : 1, 1);
+    ctx.drawImage(img, -9, -19);
+    ctx.restore();
 
-    // 指向游標的砲管
+    // 指向游標的砲管：逐像素畫的短管，管口一點亮色
     const o = p.shoulder();
     const a = Math.atan2(world.mouse.y - o.y, world.mouse.x - o.x);
-    ctx.strokeStyle = '#9aa7bd';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(o.x, o.y);
-    ctx.lineTo(o.x + Math.cos(a) * 11, o.y + Math.sin(a) * 11);
-    ctx.stroke();
-    ctx.lineWidth = 1;
+    for (let k = 2; k <= 10; k++) {
+      const bx = Math.round(o.x + Math.cos(a) * k);
+      const by = Math.round(o.y + Math.sin(a) * k);
+      ctx.fillStyle = '#10131a';
+      ctx.fillRect(bx - 2, by - 2, 4, 4);
+    }
+    for (let k = 2; k <= 10; k++) {
+      const bx = Math.round(o.x + Math.cos(a) * k);
+      const by = Math.round(o.y + Math.sin(a) * k);
+      ctx.fillStyle = k >= 9 ? '#4ad0ff' : '#9aa7bd';
+      ctx.fillRect(bx - 1, by - 1, 2, 2);
+    }
 
     if (p.timeScale !== 1) this.timeTint({ x: p.x, y: p.y, w: p.w, h: p.h, time: p.timeScale });
     if (p.hasteT > 0) {
@@ -868,7 +875,7 @@ export class Renderer {
       ctx.fillRect(pt.x - 1, pt.y - 1, 2, 2);
     }
     // 傷害數字
-    ctx.font = `bold 9px ${FONT}`;
+    ctx.font = TEXT;
     ctx.textAlign = 'center';
     for (const pp of world.popups) {
       ctx.globalAlpha = Math.min(1, pp.life * 3);
@@ -958,7 +965,7 @@ export class Renderer {
         ctx.stroke();
       }
     }
-    ctx.font = `8px ${FONT}`;
+    ctx.font = TEXT;
     ctx.textAlign = 'center';
     ctx.fillText(s.name, f.x, f.y + f.r - 4);
     ctx.textAlign = 'left';
@@ -1032,73 +1039,68 @@ export class Renderer {
   drawHud(world) {
     const ctx = this.ctx;
     const p = world.player;
-    ctx.font = `9px ${FONT}`;
+    ctx.font = TEXT;
     ctx.textBaseline = 'middle';
 
     // HP / MP
     ctx.fillStyle = 'rgba(0,0,0,0.45)';
-    ctx.fillRect(4, 4, 128, 28);
+    ctx.fillRect(4, 4, 134, 30);
     ctx.fillStyle = C.hud;
-    ctx.fillText('HP', 8, 12);
+    ctx.fillText('HP', 8, 11);
     for (let i = 0; i < cfg.hp; i++) {
       ctx.fillStyle = i < p.hp ? '#ff6b6b' : '#3a3f4b';
-      ctx.fillRect(24 + i * 10, 8, 8, 8);
+      ctx.fillRect(28 + i * 10, 7, 8, 8);
+      if (i < p.hp) { ctx.fillStyle = '#ffb0b0'; ctx.fillRect(28 + i * 10, 7, 3, 2); }
     }
     ctx.fillStyle = C.hud;
-    ctx.fillText('MP', 8, 25);
+    ctx.fillText('MP', 8, 26);
     ctx.fillStyle = '#3a3f4b';
-    ctx.fillRect(24, 21, 100, 8);
+    ctx.fillRect(28, 22, 104, 8);
     // 維持自身附著時，MP 條改成閃爍的黃色，提醒正在持續消耗
     ctx.fillStyle = world.fields.channeling && Math.floor(world.time * 8) % 2 ? '#ffd34d' : '#4aa8ff';
-    ctx.fillRect(24, 21, (p.mp / cfg.mpMax) * 100, 8);
+    ctx.fillRect(28, 22, Math.round((p.mp / cfg.mpMax) * 104), 8);
     const cost = cfg.mpMax * cfg.mpCostRatio;
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    for (let x = cost; x < cfg.mpMax; x += cost) ctx.fillRect(24 + (x / cfg.mpMax) * 100, 21, 1, 8);
+    for (let x = cost; x < cfg.mpMax; x += cost) ctx.fillRect(28 + Math.round((x / cfg.mpMax) * 104), 22, 1, 8);
 
     // 房間名稱與提示
     ctx.textAlign = 'center';
     ctx.fillStyle = C.hud;
-    ctx.font = `10px ${FONT}`;
     ctx.fillText(`${world.room.name}（${world.roomIndex + 1}/${world.roomCount}）`, VIEW_W / 2, 10);
-    ctx.font = `8px ${FONT}`;
     ctx.fillStyle = C.dim;
-    ctx.fillText(cfg.showHints ? world.room.hint : '卡關時按 / 顯示提示', VIEW_W / 2, 22);
+    ctx.fillText(cfg.showHints ? world.room.hint : '卡關時按 / 顯示提示', VIEW_W / 2, 25);
 
     // 訊息
     world.toasts.forEach((t, i) => {
       ctx.globalAlpha = Math.min(1, t.life * 2);
       ctx.fillStyle = '#ffe9a8';
-      ctx.font = `9px ${FONT}`;
-      ctx.fillText(t.text, VIEW_W / 2, 40 + i * 12);
+      ctx.fillText(t.text, VIEW_W / 2, 44 + i * 14);
     });
     ctx.globalAlpha = 1;
 
     // 技能欄（右上角直排，避免擋住地板與尖刺）
-    const slotW = 66;
-    const x = VIEW_W - slotW - 6;
+    const slotW = 84;
+    const x = VIEW_W - slotW - 4;
     ctx.textAlign = 'left';
     SLOT_KEYS.forEach((slot, i) => {
       const id = world.loadout[i];
       const sk = id ? SKILLS[id] : null;
-      const y = 30 + i * 16;
+      const y = 36 + i * 16;
       ctx.fillStyle = 'rgba(0,0,0,0.55)';
-      ctx.fillRect(x, y, slotW, 14);
+      ctx.fillRect(x, y, slotW, 15);
       if (sk) {
         ctx.fillStyle = TREE_COLORS[sk.tree];
-        ctx.fillRect(x, y, 3, 14);
+        ctx.fillRect(x, y, 3, 15);
       }
-      ctx.font = `7px ${FONT}`;
       ctx.fillStyle = C.dim;
-      ctx.fillText(slot.label, x + 6, y + 7);
-      ctx.font = `9px ${FONT}`;
+      ctx.fillText(slot.label, x + 6, y + 8);
       ctx.fillStyle = sk && p.mp >= cost ? C.hud : C.dim;
-      ctx.fillText(sk ? sk.name : '—', x + 26, y + 7);
+      ctx.fillText(sk ? sk.name : '—', x + 32, y + 8);
     });
 
-    ctx.font = `8px ${FONT}`;
     ctx.fillStyle = C.dim;
-    ctx.fillText('H：操作說明　Tab：裝備', 6, 40);
-    if (this.versionLabel) ctx.fillText('水：' + this.versionLabel, 6, 52);
+    ctx.fillText('H 說明　Tab 裝備', 6, 44);
+    if (this.versionLabel) ctx.fillText('水：' + this.versionLabel, 6, 58);
     ctx.textBaseline = 'alphabetic';
   }
 
@@ -1126,15 +1128,15 @@ export class Renderer {
       }
     }
     if (!text) return;
-    ctx.font = `8px ${FONT}`;
+    ctx.font = TEXT;
     const w = ctx.measureText(text).width;
     // 靠近右邊緣時改顯示在游標左側
     const tx = x + 10 + w > VIEW_W - 4 ? x - 10 - w : x + 10;
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(tx - 3, y + 6, w + 6, 12);
+    ctx.fillRect(Math.round(tx) - 3, y + 6, Math.ceil(w) + 6, 15);
     ctx.fillStyle = color;
     ctx.textBaseline = 'middle';
-    ctx.fillText(text, tx, y + 12);
+    ctx.fillText(text, Math.round(tx), y + 14);
     ctx.textBaseline = 'alphabetic';
   }
 

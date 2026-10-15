@@ -66,6 +66,10 @@ ES Modules 必須透過 HTTP 載入，不能直接雙擊 `index.html`。
 
 除錯參數面板可以即時調整數值（需要網路，從 CDN 載入 lil-gui）。
 
+## 美術
+
+像素風：遊戲畫在 640×360 的畫布上再整數倍放大；精靈與圖塊在 `js/pixel/art.js`（做法參考 GriMon）。畫布文字使用 [Fusion Pixel](https://github.com/TakWolf/fusion-pixel-font) 12px（OFL 授權，見 `fonts/`）。
+
 ## 文件
 
 完整企劃、設計決策與程式結構：[docs/design.md](docs/design.md)
