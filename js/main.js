@@ -99,6 +99,7 @@ input.onKey((code) => {
       world.loadRoom(world.roomIndex - 1);
       break;
     case 'KeyT':
+      world.player.mp = cfg.mpMax;
       world.loadRoom(world.roomIndex);
       break;
     case 'KeyG':

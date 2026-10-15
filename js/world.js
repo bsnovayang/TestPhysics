@@ -292,6 +292,7 @@ export class World {
       return;
     }
     if (respawn) {
+      p.mp = cfg.mpMax; // 重生時 MP 回滿，避免回到入口後還要等 MP 回復
       this.toast(`-${amount} HP，回到入口`);
       this.resetRoom();
       return;
