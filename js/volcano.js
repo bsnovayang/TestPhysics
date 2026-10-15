@@ -203,15 +203,15 @@ export class Vent {
         break;
       case 'warn':
         // 預兆：細小的亮黃色火花往上飄（和真正噴出來、比較大塊的熔岩區分開；太暗的話在熔岩上看起來像破洞）
-        if (Math.random() < 0.3) world.particles.push({ x: this.cx + (Math.random() - 0.5) * 10, y: this.y + 2, vx: (Math.random() - 0.5) * 12, vy: -25 - Math.random() * 30, life: 0.45, color: '#ffd27a' });
+        if (world.rng() < 0.3) world.particles.push({ x: this.cx + (world.rng() - 0.5) * 10, y: this.y + 2, vx: (world.rng() - 0.5) * 12, vy: -25 - world.rng() * 30, life: 0.45, color: '#ffd27a' });
         if (this.timer <= 0) {
           if (this.blocked) { this.state = 'idle'; this.timer = cfg.ventInterval; break; }
           this.state = 'erupt';
           this.timer = cfg.ventDuration;
           for (let k = 0; k < cfg.ventBombs; k++) {
             const side = k % 2 ? 1 : -1;
-            const a = -Math.PI / 2 + side * (0.35 + Math.random() * 0.5);
-            const s = 300 + Math.random() * 80;
+            const a = -Math.PI / 2 + side * (0.35 + world.rng() * 0.5);
+            const s = 300 + world.rng() * 80;
             world.entities.push(new VolcanicBomb(this.cx, this.y, Math.cos(a) * s, Math.sin(a) * s));
           }
         }
@@ -219,8 +219,8 @@ export class Vent {
       case 'erupt': {
         // 每一幀噴出一塊熔岩，方向和當下的重力相反，速度略有不同，連起來像一根熔岩柱
         const d = world.water.downAt(m) ?? { x: 0, y: 1 };
-        const s = cfg.ventSpeed * (0.85 + Math.random() * 0.3);
-        const side = (Math.random() - 0.5) * 40;
+        const s = cfg.ventSpeed * (0.85 + world.rng() * 0.3);
+        const side = (world.rng() - 0.5) * 40;
         // 每一幀噴出兩塊（左右各偏一點），凍住時才會是一根夠寬、站得上去的柱子
         for (const off of [-5, 5]) {
           const ox = d.y ? off : 0;

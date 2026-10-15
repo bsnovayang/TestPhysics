@@ -5,6 +5,7 @@
 // 傳送門、蒸氣浮台、渦輪等原本的系統都可以直接沿用。
 import { cfg, TILE, COLS, ROWS } from '../../js/config.js';
 import { WaterSystem, STEAM_EXPANSION } from '../../js/water.js';
+import { makeRng, seedFromString } from '../../js/rng.js';
 
 const FS = 2;                 // 小格的大小（px）
 const PER = TILE / FS;        // 一個大格的邊長 = 8 個小格
@@ -37,6 +38,8 @@ export class PixelWaterSystem extends WaterSystem {
     this.convertFrac = new Float32Array(COLS * ROWS);
     this.drawsSteam = true;
     this.drawsLava = true;
+    // 固定種子：由房間地圖算出，同一個房間每次載入都從同樣的亂數開始，同樣的操作就會得到同樣的結果
+    this.rand = makeRng(seedFromString(map.rows.map((r) => r.join('')).join('|')));
     // 地圖上的熔岩（父類別已經轉成熔岩量）變成熔岩像素
     for (let ty = 0; ty < ROWS; ty++) for (let tx = 0; tx < COLS; tx++) {
       if (this.lava[this.idx(tx, ty)] > 0) this.fillTile(tx, ty, LAVA, Math.round(this.lava[this.idx(tx, ty)] * CELLS_PER_TILE));
@@ -275,20 +278,20 @@ export class PixelWaterSystem extends WaterSystem {
         const t = this.idx(fx >> 3, fy >> 3);
         const time = this.tTime[t];
         if (time < 0.05) continue;                      // 時停：凍結
-        if (time < 1 && Math.random() > time) continue;  // 慢動作：有機率不動
+        if (time < 1 && this.rand() > time) continue;  // 慢動作：有機率不動
         const dx = this.tDown[t * 2];
         const dy = this.tDown[t * 2 + 1];
         if (m === STEAM && this.condense(t, fx, fy, -dx, -dy, dt)) { this.mat[i] = WATER; continue; }
         if (dx === 0 && dy === 0) continue;             // 無重力：停在原地
         const sx = dy !== 0 ? 1 : 0;                    // 兩側的方向
         const sy = dy !== 0 ? 0 : 1;
-        const r = Math.random() < 0.5 ? 1 : -1;
+        const r = this.rand() < 0.5 ? 1 : -1;
 
         if (m === LAVA) {
-          if (Math.random() > P.LAVA_RATE) continue;
+          if (this.rand() > P.LAVA_RATE) continue;
           if (this.tryMove(world, fx, fy, fx + dx, fy + dy, m)) continue;
           if (this.tryMove(world, fx, fy, fx + dx + sx * r, fy + dy + sy * r, m)) continue;
-          if (Math.random() < 0.5) this.tryMove(world, fx, fy, fx + sx * r, fy + sy * r, m);
+          if (this.rand() < 0.5) this.tryMove(world, fx, fy, fx + sx * r, fy + sy * r, m);
           continue;
         }
         if (m === WATER) {
@@ -311,12 +314,12 @@ export class PixelWaterSystem extends WaterSystem {
         } else {
           const ux = -dx;
           const uy = -dy;
-          if (Math.random() < P.STEAM_RISE) {
+          if (this.rand() < P.STEAM_RISE) {
             if (this.tryMove(world, fx, fy, fx + ux, fy + uy, m)) continue;
             if (this.tryMove(world, fx, fy, fx + ux + sx * r, fy + uy + sy * r, m)) continue;
           }
           // 隨機往兩側飄
-          if (Math.random() < 0.3 + cfg.steamWander) this.tryMove(world, fx, fy, fx + sx * r, fy + sy * r, m);
+          if (this.rand() < 0.3 + cfg.steamWander) this.tryMove(world, fx, fy, fx + sx * r, fy + sy * r, m);
         }
       }
     }
@@ -332,7 +335,7 @@ export class PixelWaterSystem extends WaterSystem {
       const capped = nx < 0 || nx >= FW || ny < 0 || ny >= FH || this.mask[this.fi(nx, ny)];
       if (capped) rate *= 6;
     }
-    return Math.random() < rate * dt;
+    return this.rand() < rate * dt;
   }
 
   // 熔岩碰到水：熔岩夠多的格子凝固成石頭，裡面的水變成蒸氣冒到上方；熔岩太少時只把碰到的水煮成蒸氣

@@ -6,14 +6,16 @@ import { SKILLS, SKILL_ORDER, DEBUG_KEYS, TREE_COLORS } from './skills.js';
 import { createDebugPanel } from './debug.js';
 import { ROOMS } from './rooms.js';
 
-// 水的版本：?water=particle（粒子版）、?water=fx（原版＋粒子特效）、?water=pixel（Noita 風像素水），預設為原版（格子水）
+// 水的版本：預設為 Noita 風像素水（正式版）；?water=cell（原版格子水）、?water=particle（粒子版）、?water=fx（原版＋粒子特效）用來比較
+const DEFAULT_WATER = 'pixel';
 const WATER_VERSIONS = {
   cell: { name: '原版（格子水）' },
   particle: { name: '粒子版', module: '../experiments/particle-water/particle-water.js' },
   fx: { name: '原版＋粒子特效', module: '../experiments/water-fx/water-fx.js' },
-  pixel: { name: 'Noita 風像素水', module: '../experiments/pixel-water/pixel-water.js' },
+  pixel: { name: 'Noita 風像素水（正式）', module: '../experiments/pixel-water/pixel-water.js' },
 };
-const waterMode = WATER_VERSIONS[new URLSearchParams(location.search).get('water')] ? new URLSearchParams(location.search).get('water') : 'cell';
+const waterParam = new URLSearchParams(location.search).get('water');
+const waterMode = WATER_VERSIONS[waterParam] ? waterParam : DEFAULT_WATER;
 const waterModule = WATER_VERSIONS[waterMode].module ? await import(WATER_VERSIONS[waterMode].module) : {};
 
 const canvas = document.getElementById('game');
@@ -177,7 +179,7 @@ function buildVersionLinks() {
   if (!box) return;
   for (const [key, v] of Object.entries(WATER_VERSIONS)) {
     const p = new URLSearchParams(location.search);
-    if (key === 'cell') p.delete('water'); else p.set('water', key);
+    if (key === DEFAULT_WATER) p.delete('water'); else p.set('water', key);
     const a = document.createElement('a');
     a.href = '?' + p.toString();
     a.textContent = v.name;

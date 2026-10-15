@@ -15,14 +15,14 @@ ES Modules 必須透過 HTTP 載入，不能直接雙擊 `index.html`。
 
 ## 水的四種版本（比較用）
 
-開始畫面可以直接切換，或使用下列網址：
+**預設是 Noita 風像素水（正式版）**，其他版本保留下來比較。開始畫面可以直接切換，或使用下列網址：
 
 | 版本 | 網址 | 說明 |
 |---|---|---|
-| 原版（格子水） | `index.html` | 每一格存一個水量，流動可預測 |
+| 原版（格子水） | `index.html?water=cell` | 每一格存一個水量，流動可預測 |
 | 粒子版 | `index.html?water=particle` 或 `experiments/particle-water/` | 用粒子模擬水流，再換算回格子，其他系統直接沿用 |
 | 原版＋粒子特效 | `index.html?water=fx` 或 `experiments/water-fx/` | 運作和原版相同，畫面加上水珠、水花、水面波紋 |
-| Noita 風像素水 | `index.html?water=pixel` 或 `experiments/pixel-water/` | 落沙模擬：每 2×2 px 一格，水和蒸氣都是像素 |
+| **Noita 風像素水（正式）** | `index.html` 或 `experiments/pixel-water/` | 落沙模擬：每 2×2 px 一格，水、蒸氣、熔岩都是像素；亂數固定種子，同樣的操作結果相同 |
 
 建議在房間 G（冰與水）和 H（蒸氣）比較，也可以按住 N 倒水、B 噴蒸氣。
 

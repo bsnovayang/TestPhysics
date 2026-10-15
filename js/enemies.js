@@ -244,7 +244,7 @@ export class Flyer extends Enemy {
     super(tx, ty, 14, 12);
     this.homeY = this.y;
     this.color = '#ff6bcb';
-    this.phase = Math.random() * Math.PI * 2;
+    this.phase = (tx * 1.7 + ty * 0.9) % (Math.PI * 2); // 依位置決定，不用亂數（結果才會每次相同）
   }
 
   physics(world, ldt) {

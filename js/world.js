@@ -15,6 +15,7 @@ import { Vent, LiquidSource } from './volcano.js';
 // 干擾裝置的地圖字元：1～4 固定、5～8 可移動，依序為 重力、時間、空間、全部
 const JAMMER_KINDS = ['gravity', 'time', 'space', 'all'];
 import { ROOMS } from './rooms.js';
+import { makeRng } from './rng.js';
 
 const KEEP_IN_MAP = new Set(['#', '^', 'D', '|', 'I', 'Z']);
 
@@ -108,6 +109,8 @@ export class World {
 
   loadRoom(index) {
     this.roomIndex = ((index % ROOMS.length) + ROOMS.length) % ROOMS.length;
+    // 會影響玩法的亂數（火山彈的角度、熔岩塊的速度）用固定種子，每次進入房間都一樣
+    this.rng = makeRng(1000 + this.roomIndex);
     const parsed = parseRoom(this.room);
     this.map = new TileMap(parsed.rows);
     this.water = this.createWater(this.map);
