@@ -17,6 +17,7 @@ export class Player extends Body {
     this.dashCd = 0;
     this.airDashUsed = false;
     this.invT = 0;
+    this.stunT = 0; // 受傷硬直：期間不接受移動輸入
     this.hasteT = 0;
     this.cannonCd = 0;
     this.timeScale = 1;
@@ -44,7 +45,8 @@ export class Player extends Body {
     const input = world.input;
     this.sample(world);
 
-    let t = this.mods.time * (this.hasteT > 0 ? 2 : 1);
+    const hasted = this.hasteT > 0 && !world.fields.jammedAt(this.cx, this.cy, 'time');
+    let t = this.mods.time * (hasted ? 2 : 1);
     t = Math.min(Math.max(t, cfg.playerMinTime), cfg.maxTimeScale);
     this.timeScale = t;
     const ldt = dt * t;
@@ -68,7 +70,7 @@ export class Player extends Body {
     // 跳躍（起跳速度固定，以正常重力換算）
     if (input.wasPressed('Space')) this.bufferT = cfg.jumpBuffer;
     else this.bufferT -= ldt;
-    if (this.bufferT > 0 && this.coyoteT > 0 && this.groundAxis) {
+    if (this.bufferT > 0 && this.coyoteT > 0 && this.groundAxis && this.stunT <= 0) {
       // 補上逐步積分損失的高度（g·dt/2），再多留一點餘裕，確保剛好 N 格高的台階跳得上去
       const v0 = Math.sqrt(2 * cfg.gravity * (cfg.jumpHeight + 0.15) * TILE) + (cfg.gravity * STEP) / 2;
       if (this.groundAxis === 'y') this.vy = -this.groundSign * v0;
@@ -81,7 +83,7 @@ export class Player extends Body {
     // 衝刺（空中只能一次）
     this.dashCd -= dt;
     if (input.wasPressed('ShiftLeft') || input.wasPressed('ShiftRight')) {
-      if (this.dashCd <= 0 && (this.grounded || !this.airDashUsed)) {
+      if (this.dashCd <= 0 && this.stunT <= 0 && (this.grounded || !this.airDashUsed)) {
         this.dashT = cfg.dashTime;
         this.dashDir = inX || this.facing;
         this.dashCd = cfg.dashCooldown;
@@ -89,12 +91,13 @@ export class Player extends Body {
       }
     }
 
+    this.stunT -= dt;
     if (this.dashT > 0) {
       this.dashT -= ldt;
       this.vx = this.dashDir * cfg.dashSpeed;
       if (!this.grounded) this.vy = 0;
     } else {
-      this.applyControl(inX, inY, ldt);
+      if (this.stunT <= 0) this.applyControl(inX, inY, ldt);
       this.applyGravity(ldt);
     }
 

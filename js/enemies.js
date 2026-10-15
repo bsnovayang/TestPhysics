@@ -1,6 +1,7 @@
 import { cfg, TILE } from './config.js';
 import { Body, approach, impactDamage } from './body.js';
 import { Bullet } from './projectiles.js';
+import { traceBeam, applyBeamHit } from './light.js';
 
 class Enemy extends Body {
   constructor(tx, ty, w, h) {
@@ -15,6 +16,7 @@ class Enemy extends Body {
     this.stunT = 0;
     this.flashT = 0;
     this.impactCd = 0;          // 物體互撞後的短暫冷卻，避免重疊時每幀重複受傷
+    this.laserCd = 0;           // 被雷射打到後的短暫冷卻
     this.time = 1;
   }
 
@@ -25,6 +27,7 @@ class Enemy extends Body {
     this.stunT -= ldt;
     this.flashT -= dt;
     this.impactCd -= dt;
+    this.laserCd -= dt;
     this.checkGrounded(world);
     if (ldt > 0) {
       this.think(world, ldt);
@@ -116,6 +119,81 @@ export class Walker extends Enemy {
   physics(world, ldt) {
     super.physics(world, ldt);
     if (this.lastMove.bx && this.stunT <= 0) this.dir *= -1;
+  }
+}
+
+// 雷射兵：巡邏，看到玩家就停下來集氣（前段追蹤玩家、最後一段鎖定方向），然後發射雷射。
+// 雷射射程無限，直到被擋住；會被鏡子反射、穿過傳送門、被重力彎曲、被時間場域折射，也會打傷其他敵人
+export class LaserEnemy extends Walker {
+  constructor(tx, ty) {
+    super(tx, ty);
+    this.speed = 28;
+    this.color = '#e84393';
+    this.state = 'patrol';
+    this.timer = 0;
+    this.aim = { x: 1, y: 0 };
+  }
+
+  get eye() {
+    return { x: this.cx, y: this.cy - 2 };
+  }
+
+  canSee(world, target) {
+    const e = this.eye;
+    const dx = target.cx - e.x;
+    const dy = target.cy - e.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 360) return false;
+    for (let t = 8; t < d; t += 6) {
+      if (world.map.pointSolid(e.x + (dx / d) * t, e.y + (dy / d) * t)) return false;
+    }
+    return true;
+  }
+
+  aimAt(target) {
+    const e = this.eye;
+    const d = Math.hypot(target.cx - e.x, target.cy - e.y) || 1;
+    this.aim = { x: (target.cx - e.x) / d, y: (target.cy - e.y) / d };
+  }
+
+  think(world, ldt) {
+    const p = world.player;
+    this.timer += ldt;
+    switch (this.state) {
+      case 'patrol':
+        super.think(world, ldt);
+        if (this.timer > cfg.laserCooldown && this.stunT <= 0 && this.canSee(world, p)) {
+          this.state = 'charge';
+          this.timer = 0;
+        }
+        return;
+      case 'charge':
+        this.applyFriction(600 * ldt);
+        if (this.timer < cfg.laserCharge - cfg.laserLock) this.aimAt(p);
+        this.emit(world, 'telegraph');
+        if (this.timer >= cfg.laserCharge) { this.state = 'fire'; this.timer = 0; }
+        return;
+      case 'fire': {
+        this.applyFriction(600 * ldt);
+        const hit = this.emit(world, 'laser');
+        applyBeamHit(world, hit, cfg.laserDamage, this.cx);
+        if (this.timer >= cfg.laserFire) { this.state = 'patrol'; this.timer = 0; }
+      }
+    }
+  }
+
+  // 被擊退時打斷集氣
+  takeDamage(world, amount, dir) {
+    super.takeDamage(world, amount, dir);
+    if (this.state === 'charge') { this.state = 'patrol'; this.timer = 0; }
+  }
+
+  emit(world, kind) {
+    const e = this.eye;
+    const beam = traceBeam(world, e.x + this.aim.x * 8, e.y + this.aim.y * 8, this.aim.x, this.aim.y, this);
+    const locked = kind === 'telegraph' && this.timer >= cfg.laserCharge - cfg.laserLock;
+    world.beams.push({ segments: beam.segments, kind: locked ? 'locked' : kind });
+    return beam.hit;
   }
 }
 

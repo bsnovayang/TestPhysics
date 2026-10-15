@@ -57,14 +57,20 @@ export class Portal {
 export class PortalSystem {
   constructor() {
     this.list = [];
+    this.jammers = []; // 由 World 每幀更新
   }
 
   clear() {
     this.list.length = 0;
   }
 
+  jammed(p) {
+    return this.jammers.some((j) => (j.kind === 'space' || j.kind === 'all') && Math.hypot(p.cx - j.x, p.cy - j.y) <= j.r);
+  }
+
+  // 兩個門都在，而且都沒有被空間干擾器影響時才有作用
   get active() {
-    return this.list.length === 2;
+    return this.list.length === 2 && !this.list.some((p) => this.jammed(p));
   }
 
   partner(p) {

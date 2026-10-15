@@ -152,6 +152,39 @@ export class Crusher {
   }
 }
 
+// 干擾裝置：範圍內，指定顏色（技能樹）的場域失效；空間干擾器讓範圍內的傳送門停止運作、閃現不能進出。
+// kind：'gravity'、'time'、'space'、'all'。無法破壞
+export class FixedJammer {
+  constructor(tx, ty, kind) {
+    this.x = tx * TILE;
+    this.y = ty * TILE;
+    this.w = TILE;
+    this.h = TILE;
+    this.kind = kind;
+    this.isJammer = true;
+    this.solid = true;
+    this.alive = true;
+  }
+
+  get cx() { return this.x + this.w / 2; }
+  get cy() { return this.y + this.h / 2; }
+  get r() { return cfg.jammerRadius; }
+
+  update() {}
+}
+
+// 可移動的干擾裝置：和箱子一樣可以推、會被空氣砲推動，也會受其他顏色的場域影響
+// （例如重力干擾器可以被時停，但重力場域在它身邊沒有作用）
+export class MovableJammer extends Box {
+  constructor(tx, ty, kind) {
+    super(tx, ty);
+    this.kind = kind;
+    this.isJammer = true;
+  }
+
+  get r() { return cfg.jammerRadius; }
+}
+
 // 箱子生成器：箱子被拿走（離開生成點）或消失後，過一段時間補一個新的。
 // 同一個生成器產生的箱子超過上限時，最舊的那個會消失
 export class BoxSpawner {
@@ -200,20 +233,34 @@ export class BoxSpawner {
   }
 }
 
-// 開關。kind = 'lock'：只對鑰匙箱有反應；kind = 'plate'：任何有重量的物體都可以
+// 開關。kind = 'lock'：只對鑰匙箱有反應；kind = 'plate'：任何有重量的物體都可以；
+// kind = 'light'：光線接收器，被光照到時啟動
 export class Switch {
   constructor(tx, ty, kind) {
     this.tx = tx;
     this.ty = ty;
     this.kind = kind;
+    this.pressed = false;
+    this.lit = false;
+    if (kind === 'light') {
+      this.x = tx * TILE;
+      this.y = ty * TILE;
+      this.w = TILE;
+      this.h = TILE;
+      return;
+    }
     this.x = tx * TILE + 1;
     this.y = ty * TILE + 12;
     this.w = TILE - 2;
     this.h = 4;
-    this.pressed = false;
   }
 
   update(world) {
+    if (this.kind === 'light') {
+      // 被照亮過一次就保持啟動，避免玩家走過去時不小心推開鏡子，門又關上
+      if (this.lit) this.pressed = true;
+      return;
+    }
     const candidates = this.kind === 'lock'
       ? world.entities.filter((e) => e instanceof Box && e.key && e.alive)
       : world.bodies();

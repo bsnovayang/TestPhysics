@@ -1,7 +1,10 @@
 import { cfg, TILE, COLS, ROWS, VIEW_W, VIEW_H, SLOT_KEYS } from './config.js';
 import { SKILLS, TREE_COLORS } from './skills.js';
 import { Box, BoxSpawner, MovingPlatform, Blade, Crusher } from './objects.js';
-import { Heavy, Jumper, Flyer, Turret } from './enemies.js';
+import { Heavy, Jumper, Flyer, Turret, LaserEnemy } from './enemies.js';
+import { Emitter, MirrorBox } from './light.js';
+
+const JAMMER_COLORS = { ...TREE_COLORS, all: '#ffffff' };
 
 const FONT = '"Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif';
 const C = {
@@ -64,8 +67,10 @@ export class Renderer {
     this.drawTiles(world);
     this.drawPortals(world);
     this.drawSwitchesAndDoors(world);
+    this.drawJammerRanges(world);
     for (const e of world.entities) this.drawEntity(world, e);
     this.drawPlayer(world);
+    this.drawBeams(world);
     this.drawProjectiles(world);
     this.drawParticles(world);
     this.drawFieldOutlines(world);
@@ -196,12 +201,29 @@ export class Renderer {
     if (doors.length && !world.map.doorOpen) {
       const mid = doors[Math.floor(doors.length / 2)];
       if (hasLock) this.drawLock(mid.tx * TILE + 8, mid.ty * TILE + 8, C.key);
-      else this.drawPlateIcon(mid.tx * TILE + 8, mid.ty * TILE + 8);
+      else if (world.switches.some((s) => s.kind === 'light')) {
+        ctx.fillStyle = '#7ff3ff';
+        ctx.beginPath();
+        ctx.arc(mid.tx * TILE + 8, mid.ty * TILE + 8, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      } else this.drawPlateIcon(mid.tx * TILE + 8, mid.ty * TILE + 8);
     }
 
     for (const s of world.switches) {
       const x = s.tx * TILE;
       const y = s.ty * TILE;
+      if (s.kind === 'light') {
+        // 光線接收器：被照到時發亮
+        ctx.fillStyle = '#2a2f3c';
+        ctx.fillRect(x, y, TILE, TILE);
+        ctx.fillStyle = s.pressed ? '#bffaff' : '#4a6a72';
+        ctx.beginPath();
+        ctx.arc(x + 8, y + 8, s.pressed ? 5 : 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#7ff3ff';
+        ctx.strokeRect(x + 0.5, y + 0.5, TILE - 1, TILE - 1);
+        continue;
+      }
       const color = s.kind === 'lock' ? C.key : C.plate;
       ctx.fillStyle = s.pressed ? color : '#555c6b';
       ctx.fillRect(x + 1, y + (s.pressed ? 14 : 12), TILE - 2, s.pressed ? 2 : 4);
@@ -259,8 +281,102 @@ export class Renderer {
     ctx.strokeRect(obj.x - 1.5, obj.y - 1.5, obj.w + 3, obj.h + 3);
   }
 
+  // 干擾裝置的範圍：對應技能顏色的虛線圓
+  drawJammerRanges(world) {
+    const ctx = this.ctx;
+    for (const e of world.entities) {
+      if (!e.isJammer) continue;
+      const color = JAMMER_COLORS[e.kind];
+      ctx.globalAlpha = 0.07;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(e.cx, e.cy, e.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 0.6;
+      ctx.strokeStyle = color;
+      ctx.setLineDash([2, 4]);
+      ctx.lineDashOffset = -world.time * 8;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.lineDashOffset = 0;
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // 光線：解謎用的光（青色）、集氣預告（紅色細線，鎖定後變亮）、雷射（粗白線加紅色光暈）
+  drawBeams(world) {
+    const ctx = this.ctx;
+    const styles = {
+      emitter: [{ color: 'rgba(127,243,255,0.25)', width: 5 }, { color: '#bffaff', width: 1.5 }],
+      telegraph: [{ color: 'rgba(255,80,120,0.45)', width: 1, dash: [3, 3] }],
+      locked: [{ color: Math.floor(world.time * 16) % 2 ? '#ff5078' : '#ffc0d0', width: 1.5 }],
+      laser: [{ color: 'rgba(255,60,110,0.5)', width: 7 }, { color: '#ffffff', width: 2.5 }],
+    };
+    ctx.lineCap = 'round';
+    for (const beam of world.beams) {
+      for (const st of styles[beam.kind]) {
+        ctx.strokeStyle = st.color;
+        ctx.lineWidth = st.width;
+        ctx.setLineDash(st.dash ?? []);
+        for (const seg of beam.segments) {
+          if (seg.length < 2) continue;
+          ctx.beginPath();
+          ctx.moveTo(seg[0].x, seg[0].y);
+          for (let i = 1; i < seg.length; i++) ctx.lineTo(seg[i].x, seg[i].y);
+          ctx.stroke();
+        }
+      }
+    }
+    ctx.setLineDash([]);
+    ctx.lineWidth = 1;
+    ctx.lineCap = 'butt';
+  }
+
   drawEntity(world, e) {
     const ctx = this.ctx;
+    if (e.isJammer) {
+      const color = JAMMER_COLORS[e.kind];
+      ctx.fillStyle = '#2a2f3c';
+      ctx.fillRect(e.x, e.y, e.w, e.h);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(e.x + 1, e.y + 1, e.w - 2, e.h - 2);
+      // 禁止符號
+      ctx.beginPath();
+      ctx.arc(e.cx, e.cy, 4.5, 0, Math.PI * 2);
+      ctx.moveTo(e.cx - 3.2, e.cy + 3.2);
+      ctx.lineTo(e.cx + 3.2, e.cy - 3.2);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      // 可移動的干擾器底部畫兩條線，和固定的區分
+      if (e instanceof Box) {
+        ctx.fillStyle = color;
+        ctx.fillRect(e.x + 2, e.y + e.h - 3, e.w - 4, 1);
+      }
+      this.timeTint(e);
+      return;
+    }
+    if (e instanceof Emitter) {
+      ctx.fillStyle = '#3b4250';
+      ctx.fillRect(e.x, e.y, e.w, e.h);
+      ctx.fillStyle = '#7ff3ff';
+      const d = e.dir ?? { x: 1, y: 0 };
+      ctx.fillRect(e.cx + d.x * 5 - 2, e.cy + d.y * 5 - 2, 4, 4);
+      return;
+    }
+    if (e instanceof MirrorBox) {
+      ctx.fillStyle = '#4b5a6b';
+      ctx.fillRect(e.x, e.y, e.w, e.h);
+      ctx.strokeStyle = '#d8f6ff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      if (e.orient === '/') { ctx.moveTo(e.x + 2, e.y + e.h - 2); ctx.lineTo(e.x + e.w - 2, e.y + 2); }
+      else { ctx.moveTo(e.x + 2, e.y + 2); ctx.lineTo(e.x + e.w - 2, e.y + e.h - 2); }
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      this.timeTint(e);
+      return;
+    }
     if (e instanceof BoxSpawner) {
       // 生成器：外框＋補充進度條
       ctx.strokeStyle = '#8a6435';
@@ -367,7 +483,14 @@ export class Renderer {
       ctx.fillRect(dir > 0 ? e.x + e.w - 5 : e.x + 3, eyeY, 2, 2);
     }
 
-    if (e instanceof Heavy) {
+    if (e instanceof LaserEnemy) {
+      // 眼睛：集氣時越來越亮
+      const charge = e.state === 'charge' ? Math.min(1, e.timer / cfg.laserCharge) : e.state === 'fire' ? 1 : 0;
+      ctx.fillStyle = `rgba(255,${Math.round(220 - charge * 180)},${Math.round(240 - charge * 160)},1)`;
+      ctx.beginPath();
+      ctx.arc(e.eye.x, e.eye.y, 2 + charge * 2, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (e instanceof Heavy) {
       ctx.strokeStyle = '#ffd34d';
       ctx.lineWidth = 2;
       ctx.strokeRect(e.x + 1, e.y + 1, e.w - 2, e.h - 2);

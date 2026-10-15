@@ -52,6 +52,14 @@ export async function createDebugPanel() {
   space.add(cfg, 'portalDuration', 5, 120, 5).name('傳送門持續時間');
   space.add(cfg, 'portalMinExit', 0, 400, 10).name('出口最低速度');
 
+  const light = gui.addFolder('干擾與光線');
+  light.add(cfg, 'jammerRadius', 16, 160, 4).name('干擾器範圍');
+  light.add(cfg, 'lightBend', 0, 1e-4, 1e-6).name('重力彎曲光線');
+  light.add(cfg, 'laserDamage', 0, 5, 1).name('雷射兵傷害');
+  light.add(cfg, 'laserCharge', 0.5, 5, 0.1).name('雷射集氣秒數');
+  light.add(cfg, 'laserLock', 0, 2, 0.05).name('鎖定秒數');
+  light.add(cfg, 'emitterDamage', 0, 5, 1).name('發射器傷害');
+
   const impact = gui.addFolder('撞擊傷害');
   impact.add(cfg, 'impactThreshold', 50, 600, 10).name('速度門檻');
   impact.add(cfg, 'impactPerDamage', 20, 400, 10).name('每點傷害所需速度');

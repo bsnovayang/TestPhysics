@@ -26,7 +26,9 @@ export const cfg = {
   dashTime: 0.15,
   dashCooldown: 0.35,
   playerMinTime: 0.2,    // 玩家在時停或強減速中的最低倍率
-  invulnTime: 1,
+  invulnTime: 1.5,       // 受傷後的無敵時間（尖刺與掉落會直接回到入口，不受此限制）
+  hitStun: 0.35,         // 受傷後短暫無法操作，讓擊退真的把角色推離敵人
+  knockback: 170,
 
   // 場域
   fieldRadius: 32,       // 約等於角色身高（2 格）
@@ -47,6 +49,18 @@ export const cfg = {
   blinkThroughWalls: false,  // 之後解鎖
   portalDuration: 30,
   portalMinExit: 150,        // 離開傳送門的最低速度，避免卡在門口
+
+  // 干擾裝置
+  jammerRadius: 48,          // 3 格
+
+  // 光線
+  lightBend: 2e-5,           // 重力場域讓光線彎曲的程度
+  emitterDamage: 0,          // 雷射發射器（解謎裝置）預設無害
+  laserDamage: 1,            // 雷射兵的傷害
+  laserCharge: 2,            // 集氣時間（秒）
+  laserLock: 0.4,            // 集氣最後這段時間鎖定方向
+  laserFire: 0.3,
+  laserCooldown: 1.5,
 
   // 空氣砲
   cannonRate: 4,         // 每秒發數

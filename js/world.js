@@ -6,8 +6,12 @@ import { PortalSystem } from './portals.js';
 import { rectsOverlap, impactDamage } from './body.js';
 import { Player } from './player.js';
 import { Web } from './projectiles.js';
-import { Box, BoxSpawner, MovingPlatform, Blade, Crusher, Switch } from './objects.js';
-import { Walker, Heavy, Jumper, Flyer, Turret } from './enemies.js';
+import { Box, BoxSpawner, MovingPlatform, Blade, Crusher, Switch, FixedJammer, MovableJammer } from './objects.js';
+import { Walker, Heavy, Jumper, Flyer, Turret, LaserEnemy } from './enemies.js';
+import { Emitter, MirrorBox } from './light.js';
+
+// 干擾裝置的地圖字元：1～4 固定、5～8 可移動，依序為 重力、時間、空間、全部
+const JAMMER_KINDS = ['gravity', 'time', 'space', 'all'];
 import { ROOMS } from './rooms.js';
 
 const KEEP_IN_MAP = new Set(['#', '^', 'D', '|']);
@@ -29,6 +33,16 @@ function parseRoom(def) {
         case 'B': entities.push(new Box(tx, ty)); break;
         case 'K': entities.push(new Box(tx, ty, true)); break;
         case '@': entities.push(new BoxSpawner(tx, ty)); break;
+        case 'M': entities.push(new MirrorBox(tx, ty)); break;
+        case 'X': entities.push(new Emitter(tx, ty)); break;
+        case 'R': switches.push(new Switch(tx, ty, 'light')); break;
+        case 'l': entities.push(new LaserEnemy(tx, ty)); break;
+        case '1': case '2': case '3': case '4':
+          entities.push(new FixedJammer(tx, ty, JAMMER_KINDS[Number(c) - 1]));
+          break;
+        case '5': case '6': case '7': case '8':
+          entities.push(new MovableJammer(tx, ty, JAMMER_KINDS[Number(c) - 5]));
+          break;
         case 'L': switches.push(new Switch(tx, ty, 'lock')); break;
         case 'S': switches.push(new Switch(tx, ty, 'plate')); break;
         case 'O': entities.push(new Blade(tx, ty)); break;
@@ -64,6 +78,7 @@ export class World {
     this.loadout = [...DEFAULT_LOADOUT];
     this.particles = [];
     this.popups = [];
+    this.beams = [];
     this.toasts = [];
     this.time = 0;
     this.loadRoom(0);
@@ -196,6 +211,13 @@ export class World {
     const dy = this.mouse.y - from.y;
     const d = Math.min(Math.hypot(dx, dy), cfg.blinkRange);
     if (d < 1) return;
+    const tx = from.x + (dx / Math.hypot(dx, dy)) * d;
+    const ty = from.y + (dy / Math.hypot(dx, dy)) * d;
+    if (this.fields.jammedAt(from.x, from.y, 'space') || this.fields.jammedAt(tx, ty, 'space')) {
+      this.toast('空間被干擾，無法閃現');
+      this.refundSkill();
+      return;
+    }
     const ux = dx / Math.hypot(dx, dy);
     const uy = dy / Math.hypot(dx, dy);
     const free = (t) => !this.rectBlocked(from.x + ux * t - p.w / 2, from.y + uy * t - p.h / 2, p.w, p.h, p);
@@ -300,9 +322,12 @@ export class World {
       return;
     }
     p.invT = cfg.invulnTime;
+    p.stunT = cfg.hitStun;
+    p.dashT = 0;
     const away = fromX === null ? -p.facing : Math.sign(p.cx - fromX) || 1;
-    p.vx = away * 160;
-    if (p.groundAxis === 'y') p.vy = -p.groundSign * 160;
+    p.vx = away * cfg.knockback;
+    if (p.groundAxis === 'y') p.vy = -p.groundSign * cfg.knockback;
+    this.popup(p.cx, p.y, `-${amount}`, '#ff6b6b');
   }
 
   burst(x, y, color, n) {
@@ -320,6 +345,13 @@ export class World {
 
   update(dt) {
     this.time += dt;
+    // 干擾裝置的位置每幀更新（可移動的干擾器會跟著移動）
+    const jammers = this.entities.filter((e) => e.isJammer && e.alive).map((e) => ({ x: e.cx, y: e.cy, r: e.r, kind: e.kind }));
+    this.fields.jammers = jammers;
+    this.portals.jammers = jammers;
+    // 光線每幀重新計算：先清掉上一幀的光線與接收器狀態
+    this.beams = [];
+    for (const s of this.switches) s.lit = false;
     this.fields.update(dt);
     this.portals.update(dt, this);
     this.player.update(this, dt);

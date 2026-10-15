@@ -27,6 +27,36 @@ export class Field {
 export class FieldSystem {
   constructor() {
     this.list = [];
+    this.jammers = []; // 由 World 每幀更新：{ x, y, r, kind }
+  }
+
+  // 這一點是否被干擾（tree：'gravity'、'time'、'space'）
+  jammedAt(x, y, tree) {
+    return this.jammers.some((j) => (j.kind === tree || j.kind === 'all') && Math.hypot(x - j.x, y - j.y) <= j.r);
+  }
+
+  // 光線在這一點受到的彎曲（只有定向重力與點重力會讓光彎曲，就像有質量的物體）
+  lightBend(x, y) {
+    const G = cfg.gravity;
+    let bx = 0;
+    let by = 0;
+    for (const f of this.list) {
+      if (!f.contains(x, y) || this.jammedAt(x, y, f.skill.tree)) continue;
+      if (f.skill.type === 'gravityDir') {
+        bx += f.dir.x * G * f.skill.value;
+        by += f.dir.y * G * f.skill.value;
+      } else if (f.skill.type === 'gravityPoint') {
+        const dx = f.x - x;
+        const dy = f.y - y;
+        const d = Math.hypot(dx, dy);
+        if (d > 0.001) {
+          const k = (G * f.skill.value * Math.min(1, d / 8)) / d;
+          bx += dx * k;
+          by += dy * k;
+        }
+      }
+    }
+    return { x: bx, y: by };
   }
 
   clear() {
@@ -78,8 +108,9 @@ export class FieldSystem {
 
     for (const f of this.list) {
       if (!f.contains(x, y)) continue;
-      inField = true;
       const s = f.skill;
+      if (this.jammedAt(x, y, s.tree)) continue; // 干擾裝置範圍內，這個顏色的場域失效
+      inField = true;
       drag += s.drag ?? 0;
       switch (s.type) {
         case 'gravityMult':
