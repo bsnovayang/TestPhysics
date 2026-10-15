@@ -3,7 +3,7 @@ import { TileMap } from './tilemap.js';
 import { Field, FieldSystem } from './fields.js';
 import { SKILLS, DEFAULT_LOADOUT, isFieldSkill } from './skills.js';
 import { PortalSystem } from './portals.js';
-import { rectsOverlap } from './body.js';
+import { rectsOverlap, impactDamage } from './body.js';
 import { Player } from './player.js';
 import { Web } from './projectiles.js';
 import { Box, MovingPlatform, Blade, Crusher, Switch } from './objects.js';
@@ -62,6 +62,7 @@ export class World {
     this.player = new Player();
     this.loadout = [...DEFAULT_LOADOUT];
     this.particles = [];
+    this.popups = [];
     this.toasts = [];
     this.time = 0;
     this.loadRoom(0);
@@ -325,6 +326,7 @@ export class World {
       for (const e of this.entities) if (e.alive) e.update(this, dt);
       for (const p of this.projectiles) if (p.alive) p.update(this, dt);
       for (const b of this.portalTravelers()) this.portals.tryTeleport(this, b);
+      this.resolveImpacts();
       this.updateSwitches();
     }
 
@@ -338,10 +340,52 @@ export class World {
       pt.life -= dt;
     }
     this.particles = this.particles.filter((pt) => pt.life > 0);
+    for (const pp of this.popups) {
+      pp.y -= 20 * dt;
+      pp.life -= dt;
+    }
+    this.popups = this.popups.filter((pp) => pp.life > 0);
     for (const t of this.toasts) t.life -= dt;
     this.toasts = this.toasts.filter((t) => t.life > 0);
 
     if (this.pendingRoom !== null) this.loadRoom(this.pendingRoom);
+  }
+
+  // 物體互撞（箱子或敵人撞上敵人）：相對速度超過門檻時，被撞的一方依撞過來那一方的質量受傷；
+  // 撞過來的若也是敵人，同樣依對方的質量受傷。之後依質量交換動量（部分反彈）
+  resolveImpacts() {
+    const movers = this.entities.filter((e) => e.isBody && e.alive);
+    for (let i = 0; i < movers.length; i++) {
+      for (let j = i + 1; j < movers.length; j++) {
+        const a = movers[i];
+        const b = movers[j];
+        if (!a.isEnemy && !b.isEnemy) continue; // 箱子互撞不算
+        if (!rectsOverlap(a, b)) continue;
+        if ((a.isEnemy && a.impactCd > 0) || (b.isEnemy && b.impactCd > 0)) continue;
+        const rvx = a.vx - b.vx;
+        const rvy = a.vy - b.vy;
+        const rel = Math.hypot(rvx, rvy);
+        if (rel <= cfg.impactThreshold) continue;
+
+        if (b.isEnemy) b.takeImpact(this, impactDamage(rel, a.mass));
+        if (a.isEnemy) a.takeImpact(this, impactDamage(rel, b.mass));
+        for (const e of [a, b]) if (e.isEnemy) { e.impactCd = 0.3; e.stunT = 0.3; }
+
+        // 沿相對速度方向交換動量
+        const nx = rvx / rel;
+        const ny = rvy / rel;
+        const k = ((1 + cfg.impactRestitution) * rel) / (a.mass + b.mass);
+        a.vx -= nx * k * b.mass;
+        a.vy -= ny * k * b.mass;
+        b.vx += nx * k * a.mass;
+        b.vy += ny * k * a.mass;
+        this.burst((a.cx + b.cx) / 2, (a.cy + b.cy) / 2, '#ffd34d', 10);
+      }
+    }
+  }
+
+  popup(x, y, text, color) {
+    this.popups.push({ x, y, text, color, life: 0.8 });
   }
 
   updateSwitches() {

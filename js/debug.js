@@ -52,6 +52,11 @@ export async function createDebugPanel() {
   space.add(cfg, 'portalDuration', 5, 120, 5).name('傳送門持續時間');
   space.add(cfg, 'portalMinExit', 0, 400, 10).name('出口最低速度');
 
+  const impact = gui.addFolder('撞擊傷害');
+  impact.add(cfg, 'impactThreshold', 50, 600, 10).name('速度門檻');
+  impact.add(cfg, 'impactPerDamage', 20, 400, 10).name('每點傷害所需速度');
+  impact.add(cfg, 'impactRestitution', 0, 1, 0.05).name('反彈係數');
+
   const cannon = gui.addFolder('空氣砲');
   cannon.add(cfg, 'cannonRate', 1, 15, 0.5).name('每秒發數');
   cannon.add(cfg, 'cannonImpulse', 0, 800, 10).name('擊退力');

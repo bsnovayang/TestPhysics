@@ -447,6 +447,17 @@ export class Renderer {
       ctx.fillStyle = pt.color;
       ctx.fillRect(pt.x - 1, pt.y - 1, 2, 2);
     }
+    // 傷害數字
+    ctx.font = `bold 9px ${FONT}`;
+    ctx.textAlign = 'center';
+    for (const pp of world.popups) {
+      ctx.globalAlpha = Math.min(1, pp.life * 3);
+      ctx.fillStyle = '#000';
+      ctx.fillText(pp.text, pp.x + 1, pp.y + 1);
+      ctx.fillStyle = pp.color;
+      ctx.fillText(pp.text, pp.x, pp.y);
+    }
+    ctx.textAlign = 'left';
     ctx.globalAlpha = 1;
   }
 

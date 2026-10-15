@@ -1,5 +1,5 @@
 import { cfg, TILE } from './config.js';
-import { Body, approach } from './body.js';
+import { Body, approach, impactDamage } from './body.js';
 import { Bullet } from './projectiles.js';
 
 class Enemy extends Body {
@@ -9,10 +9,12 @@ class Enemy extends Body {
     this.hittable = true;
     this.hp = 3;
     this.maxHp = 3;
-    this.armored = false;
+    this.armored = false;       // 空氣砲打不痛
+    this.impactImmune = false;  // 不怕撞擊
     this.contactDamage = 1;
     this.stunT = 0;
     this.flashT = 0;
+    this.impactCd = 0;          // 物體互撞後的短暫冷卻，避免重疊時每幀重複受傷
     this.time = 1;
   }
 
@@ -22,6 +24,7 @@ class Enemy extends Body {
     const ldt = dt * this.time;
     this.stunT -= ldt;
     this.flashT -= dt;
+    this.impactCd -= dt;
     this.checkGrounded(world);
     if (ldt > 0) {
       this.think(world, ldt);
@@ -45,12 +48,29 @@ class Enemy extends Body {
     this.lastMove = this.moveByVelocity(world, ldt);
   }
 
-  takeDamage(world, amount, dir) {
-    if (!this.armored) {
-      this.hp -= amount;
-      this.flashT = 0.12;
-      if (this.hp <= 0) this.die(world);
+  // 撞到牆或地面
+  onImpact(world, speed) {
+    this.takeImpact(world, impactDamage(speed));
+  }
+
+  takeImpact(world, amount) {
+    if (amount <= 0) return;
+    if (this.impactImmune) {
+      world.popup(this.cx, this.y, '免疫', '#9aa7bd');
+      return;
     }
+    this.hurt(world, amount);
+  }
+
+  hurt(world, amount) {
+    this.hp -= amount;
+    this.flashT = 0.12;
+    world.popup(this.cx, this.y, `-${amount}`, '#ff8a8a');
+    if (this.hp <= 0) this.die(world);
+  }
+
+  takeDamage(world, amount, dir) {
+    if (!this.armored) this.hurt(world, amount);
     this.vx += (dir.x * cfg.cannonImpulse) / this.mass;
     this.vy += (dir.y * cfg.cannonImpulse) / this.mass;
     this.stunT = 0.3;
@@ -99,7 +119,7 @@ export class Walker extends Enemy {
   }
 }
 
-// 重裝兵：空氣砲打不動血量，必須用能力把它推進尖刺或坑裡
+// 重裝兵：空氣砲打不痛、也不怕撞擊，只能推進尖刺或坑裡。但它很重，被甩去撞別人時傷害很高
 export class Heavy extends Walker {
   constructor(tx, ty) {
     super(tx, ty);
@@ -110,6 +130,7 @@ export class Heavy extends Walker {
     this.mass = 5;
     this.speed = 22;
     this.armored = true;
+    this.impactImmune = true;
     this.contactDamage = 2;
     this.color = '#c0392b';
   }
@@ -175,10 +196,9 @@ export class Turret extends Enemy {
 
   physics() {}
 
+  // 砲台固定不動：會受傷，但不會被擊退
   takeDamage(world, amount) {
-    this.hp -= amount;
-    this.flashT = 0.12;
-    if (this.hp <= 0) this.die(world);
+    this.hurt(world, amount);
   }
 
   think(world, ldt) {

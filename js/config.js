@@ -56,6 +56,11 @@ export const cfg = {
   cannonDamage: 1,
   recoil: 50,
 
+  // 撞擊傷害：速度超過門檻才會受傷，超過越多傷害越高；物體互撞時以相對速度計算並乘上撞過來那一方的質量
+  impactThreshold: 320,  // px/s，約等於從 3.6 格高掉下來；要高於跳躍兵的起跳速度（270），否則它落地會自傷
+  impactPerDamage: 50,   // 超過門檻每多少 px/s 算 1 點傷害
+  impactRestitution: 0.3,
+
   // 物件
   boxFriction: 900,
 

@@ -4,6 +4,12 @@ export function rectsOverlap(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
+// 撞擊傷害：速度沒有超過門檻時為 0
+export function impactDamage(speed, mass = 1) {
+  if (speed <= cfg.impactThreshold) return 0;
+  return Math.max(1, Math.round(((speed - cfg.impactThreshold) / cfg.impactPerDamage) * mass));
+}
+
 export function approach(value, target, delta) {
   if (value < target) return Math.min(value + delta, target);
   return Math.max(value - delta, target);
@@ -102,11 +108,18 @@ export class Body {
   }
 
   // 依當前速度移動，被擋住的軸向速度歸零。回傳 x、y 的擋住物
+  // 撞到東西時，以撞擊前的速度呼叫 onImpact（有定義的物體才會受撞擊傷害）
   moveByVelocity(world, ldt) {
     const bx = this.moveAxis(world, 'x', this.vx * ldt);
-    if (bx) this.vx = 0;
+    if (bx) {
+      this.onImpact?.(world, Math.abs(this.vx));
+      this.vx = 0;
+    }
     const by = this.moveAxis(world, 'y', this.vy * ldt);
-    if (by) this.vy = 0;
+    if (by) {
+      this.onImpact?.(world, Math.abs(this.vy));
+      this.vy = 0;
+    }
     return { bx, by };
   }
 
