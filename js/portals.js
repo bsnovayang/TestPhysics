@@ -169,13 +169,17 @@ export class PortalSystem {
     return null;
   }
 
-  // 有尺寸的物體：中心穿過門面時傳送到另一個門，速度跟著轉向
+  // 有尺寸的物體：中心穿過門面時傳送到另一個門，速度跟著轉向。
+  // 物體必須真的走進門所在的牆格裡，而且只越過門面一點點；
+  // 否則站在牆的另一側、高度剛好對齊門的物體也會被傳送
   tryTeleport(world, b) {
     if (!this.active) return false;
     for (const p of this.list) {
-      if (p.depthOf(b.cx, b.cy) >= 0) continue;
+      const entryDepth = p.depthOf(b.cx, b.cy);
+      if (entryDepth >= 0 || entryDepth < -TILE) continue;
       const s = p.tangentOf(b.cx, b.cy);
       if (s < p.s0 || s > p.s1) continue;
+      if (!world.map.anyTileInRect(b.x, b.y, b.w, b.h, (tx, ty) => p.keys.has(`${tx},${ty}`))) continue;
       const q = this.partner(p);
       const rot = makeRotation(p, q);
       const rel = rot(b.cx - p.cx, b.cy - p.cy);
