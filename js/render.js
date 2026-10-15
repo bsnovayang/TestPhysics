@@ -159,6 +159,20 @@ export class Renderer {
           ctx.fillStyle = frozen ? '#e0f6ff' : 'rgba(170,215,255,0.8)';
           ctx.fillRect(x, y, TILE, 1);
         }
+        // 加熱中的水會冒泡，越接近沸騰泡泡越多
+        const heat = w.boil[w.idx(tx, ty)] / cfg.boilTime;
+        if (heat > 0.05 && !frozen) {
+          ctx.fillStyle = 'rgba(230,245,255,0.85)';
+          const n = Math.ceil(heat * 4);
+          for (let k = 0; k < n; k++) {
+            const phase = (world.time * (1.5 + k * 0.4) + k * 0.37 + tx * 0.13) % 1;
+            const bx = x + 3 + ((k * 5 + tx * 3) % 10);
+            const by = y + h - phase * h;
+            ctx.beginPath();
+            ctx.arc(bx, by, 1 + heat, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
         if (frozen) {
           ctx.strokeStyle = 'rgba(200,240,255,0.8)';
           ctx.strokeRect(x + 0.5, y + 0.5, TILE - 1, h - 1);

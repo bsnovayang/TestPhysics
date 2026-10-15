@@ -71,7 +71,8 @@ export const cfg = {
   swimCooldown: 0.25,
   iceFriction: 0.12,         // 冰面上的抓地力（倍率）
   heatRadius: 40,            // 火爐的範圍
-  boilTime: 1,               // 水被加熱多久開始沸騰
+  boilTime: 1,               // 水被加熱多久開始沸騰（加熱強度 1 時）
+  laserHeat: 3,              // 雷射的加熱強度（火爐是 1、熔岩是 3）
   boilRate: 0.3,             // 沸騰時每秒有多少水變成蒸氣（熔岩是 3 倍）
   steamRise: 0.06,           // 蒸氣每一步往上飄的比例（約每秒 3 格；舊值 0.25 約每秒 14 格）
   steamWander: 0.06,         // 蒸氣每一步隨機往左右飄的比例（讓它看起來在翻騰）

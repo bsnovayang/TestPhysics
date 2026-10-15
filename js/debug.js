@@ -66,6 +66,7 @@ export async function createDebugPanel() {
   water.add(cfg, 'steamSpread', 2, 40, 1).name('蒸氣集中程度');
   water.add(cfg, 'steamCondense', 0, 0.5, 0.01).name('蒸氣凝結速度');
   water.add(cfg, 'boilRate', 0, 2, 0.05).name('沸騰速度');
+  water.add(cfg, 'laserHeat', 0, 10, 0.5).name('雷射加熱強度');
   water.add(cfg, 'steamLift', 0, 150, 5).name('浮台上升速度');
   water.add(cfg, 'steamBlock', 0.05, 1, 0.05).name('擋光濃度');
   water.add(cfg, 'swimSpeed', 50, 300, 10).name('游泳速度');

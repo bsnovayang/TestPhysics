@@ -67,8 +67,9 @@ export function traceBeam(world, x, y, dx, dy, source = null, hitsPlayer = true)
       break;
     }
 
-    // 濃的蒸氣會擋住光線（可以當成擋雷射的煙幕）
-    if (world.water.pointSteam(nx, ny) > cfg.steamBlock) {
+    // 濃的蒸氣會擋住光線（可以當成擋雷射的煙幕）。水裡的蒸氣是氣泡，不擋光，
+    // 否則雷射剛把水煮出蒸氣，就會被自己煮出來的蒸氣擋住
+    if (world.water.pointSteam(nx, ny) > cfg.steamBlock && !world.water.pointInWater(nx, ny)) {
       cur.push({ x: nx, y: ny });
       hit = { type: 'steam' };
       break;
@@ -206,7 +207,7 @@ export class MirrorBox extends Box {
 
 // 光線擊中時的效果。damage 為 0 時無害（只用於點亮接收器、融冰、煮水）
 export function applyBeamHit(world, hit, damage, fromX, heats = []) {
-  for (const h of heats) world.water.heatWater(h.tx, h.ty, STEP);
+  for (const h of heats) world.water.heatWater(h.tx, h.ty, STEP, cfg.laserHeat); // 雷射很燙：和熔岩一樣強
   if (hit.type === 'receiver') hit.entity.lit = true;
   // 光照到冰會升溫，持續約 1 秒就融化（不管光有沒有傷害）
   if (hit.type === 'ice') {
