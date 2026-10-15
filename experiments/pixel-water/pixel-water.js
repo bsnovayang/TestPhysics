@@ -16,6 +16,10 @@ const EMPTY = 0;
 const WATER = 1;
 const STEAM = 2;
 const LAVA = 3;
+const ICE = 4;    // 冰像素：不會動；從露出的邊緣開始融化，水從表面和貼著固體的地方開始結冰
+const STONE = 5;  // 石頭像素：不會動；熔岩像素碰到水像素時變成石頭
+const HALF = CELLS_PER_TILE / 2;    // 冰超過半格，整格才對角色變成實心
+const QUARTER = CELLS_PER_TILE / 4; // 石頭超過 1/4 格就算實心（熔岩表面的石殼比較薄）
 
 export const params = {
   DISPERSE: 4,      // 水被擋住時，一幀最多往旁邊散開幾格（越大水面攤平得越快）
@@ -38,12 +42,29 @@ export class PixelWaterSystem extends WaterSystem {
     this.convertFrac = new Float32Array(COLS * ROWS);
     this.drawsSteam = true;
     this.drawsLava = true;
+    this.drawsSolids = true; // 冰和石頭也由像素畫（渲染器不畫整格的冰與石頭）
+    this.skipCellFreeze = true;
+    this.wall = new Uint8Array(FW * FH);              // 牆（冰與石頭以外的實心格）
+    this.meltAcc = new Float32Array(COLS * ROWS);
+    this.freezeAcc = new Float32Array(COLS * ROWS);
+    this.iceN = new Uint16Array(COLS * ROWS);
+    this.stoneN = new Uint16Array(COLS * ROWS);
+    // 地圖上一開始就有的冰與石頭
+    for (let ty = 0; ty < ROWS; ty++) for (let tx = 0; tx < COLS; tx++) {
+      const c = map.get(tx, ty);
+      if (c === 'I' || c === 'Q') this.fillSolid(tx, ty, c === 'I' ? ICE : STONE);
+    }
     // 固定種子：由房間地圖算出，同一個房間每次載入都從同樣的亂數開始，同樣的操作就會得到同樣的結果
     this.rand = makeRng(seedFromString(map.rows.map((r) => r.join('')).join('|')));
     // 地圖上的熔岩（父類別已經轉成熔岩量）變成熔岩像素
     for (let ty = 0; ty < ROWS; ty++) for (let tx = 0; tx < COLS; tx++) {
       if (this.lava[this.idx(tx, ty)] > 0) this.fillTile(tx, ty, LAVA, Math.round(this.lava[this.idx(tx, ty)] * CELLS_PER_TILE));
     }
+  }
+
+  // 整格填滿冰或石頭（覆蓋原本的液體）
+  fillSolid(tx, ty, m) {
+    for (let y = 0; y < PER; y++) for (let x = 0; x < PER; x++) this.mat[this.fi(tx * PER + x, ty * PER + y)] = m;
   }
 
   pointInLava(x, y) {
@@ -146,18 +167,7 @@ export class PixelWaterSystem extends WaterSystem {
     }
   }
 
-  // 冰融化：整格變成水
-  heatTile(world, tx, ty, dt) {
-    const t = this.idx(tx, ty);
-    this.heat[t] += dt * 1.5;
-    if (this.heat[t] < cfg.meltTime) return;
-    this.heat[t] = 0;
-    this.map.set(tx, ty, ' ');
-    for (let y = 0; y < PER; y++) for (let x = 0; x < PER; x++) this.mask[this.fi(tx * PER + x, ty * PER + y)] = 0;
-    this.fillTile(tx, ty, WATER, CELLS_PER_TILE);
-    this.amount[t] = 1;
-    world.burst(tx * TILE + 8, ty * TILE + 8, '#9fd8ff', 10);
-  }
+
 
   // ---- 每一幀 ----
 
@@ -169,17 +179,13 @@ export class PixelWaterSystem extends WaterSystem {
     this.buildMask(world);
     this.displace();
     this.simulate(world, dt);
+    this.reactPixels();
     this.derive();
-    this.reactPixels(world);
-    // 溫度沿用原版（火爐、熔岩、冷凍裝置）；結冰或凝固成石頭的格子要清掉裡面的像素
+    // 溫度沿用原版（火爐、熔岩加熱水與冰；冷凍裝置讓熔岩凝固）；結冰改成逐像素
     super.updateTemperature(world, dt);
-    for (let ty = 0; ty < ROWS; ty++) {
-      for (let tx = 0; tx < COLS; tx++) {
-        const c = this.map.get(tx, ty);
-        if (c !== 'I' && c !== 'Q') continue;
-        for (let y = 0; y < PER; y++) for (let x = 0; x < PER; x++) this.mat[this.fi(tx * PER + x, ty * PER + y)] = EMPTY;
-      }
-    }
+    this.freezePixels(dt);
+    this.syncSolids(world);
+    this.meltRemnants(world, dt);
     this.derive();
   }
 
@@ -202,12 +208,16 @@ export class PixelWaterSystem extends WaterSystem {
 
   buildMask(world) {
     this.mask.fill(0);
+    this.wall.fill(0);
     for (let ty = 0; ty < ROWS; ty++) {
       for (let tx = 0; tx < COLS; tx++) {
-        if (!this.blocked(tx, ty)) continue;
+        const c = this.map.get(tx, ty);
+        if (!this.blocked(tx, ty) || c === 'I' || c === 'Q') continue;
+        for (let y = 0; y < PER; y++) this.wall.fill(1, this.fi(tx * PER, ty * PER + y), this.fi(tx * PER + PER, ty * PER + y));
         for (let y = 0; y < PER; y++) this.mask.fill(1, this.fi(tx * PER, ty * PER + y), this.fi(tx * PER + PER, ty * PER + y));
       }
     }
+    for (let i = 0; i < this.mat.length; i++) if (this.mat[i] === ICE || this.mat[i] === STONE) this.mask[i] = 1;
     for (const e of world.entities) {
       if (!e.solid || !e.alive || e.isBullet) continue;
       const x0 = Math.max(0, Math.floor(e.x / FS));
@@ -223,7 +233,7 @@ export class PixelWaterSystem extends WaterSystem {
     for (let fy = 0; fy < FH; fy++) {
       for (let fx = 0; fx < FW; fx++) {
         const i = this.fi(fx, fy);
-        if (!this.mat[i] || !this.mask[i]) continue;
+        if (!this.mat[i] || !this.mask[i] || this.mat[i] === ICE || this.mat[i] === STONE) continue;
         const t = this.idx(fx >> 3, fy >> 3);
         const ux = -this.tDown[t * 2] || 0;
         const uy = -this.tDown[t * 2 + 1] || -1;
@@ -274,7 +284,7 @@ export class PixelWaterSystem extends WaterSystem {
         const fx = this.flip ? k : FW - 1 - k;
         const i = this.fi(fx, fy);
         const m = this.mat[i];
-        if (m === EMPTY || this.stamp[i] === this.frame) continue;
+        if (m === EMPTY || m === ICE || m === STONE || this.stamp[i] === this.frame) continue;
         const t = this.idx(fx >> 3, fy >> 3);
         const time = this.tTime[t];
         if (time < 0.05) continue;                      // 時停：凍結
@@ -338,42 +348,142 @@ export class PixelWaterSystem extends WaterSystem {
     return this.rand() < rate * dt;
   }
 
-  // 熔岩碰到水：熔岩夠多的格子凝固成石頭，裡面的水變成蒸氣冒到上方；熔岩太少時只把碰到的水煮成蒸氣
-  reactPixels(world) {
-    for (let ty = 0; ty < ROWS; ty++) {
-      for (let tx = 0; tx < COLS; tx++) {
-        const t = this.idx(tx, ty);
-        if (this.lava[t] <= 0.02 || this.frozenLava.has(t)) continue;
-        // 水比熔岩輕，會浮在熔岩上（在上方那一格），所以上方那一格有水也算碰到
-        const ux = -this.tDown[t * 2] || 0;
-        const uy = -this.tDown[t * 2 + 1] || -1;
-        const above = this.inBounds(tx + ux, ty + uy) ? this.amount[this.idx(tx + ux, ty + uy)] : 0;
-        if (this.amount[t] <= 0.02 && above <= 0.05) continue;
-        const waterPx = Math.round(this.amount[t] * CELLS_PER_TILE);
-        if (this.lava[t] >= 0.3 && !this.occupied(world, tx, ty)) {
-          for (let y = 0; y < PER; y++) for (let x = 0; x < PER; x++) this.mat[this.fi(tx * PER + x, ty * PER + y)] = EMPTY;
-          this.map.set(tx, ty, 'Q');
-          if (ty > 0 && !this.blocked(tx, ty - 1)) this.fillTile(tx, ty - 1, STEAM, waterPx);
-          // 浮在熔岩上方的水被煮成蒸氣
-          const ax = tx + ux;
-          const ay = ty + uy;
-          if (this.inBounds(ax, ay)) {
-            for (let y = 0; y < PER; y++) for (let x = 0; x < PER; x++) {
-              const i = this.fi(ax * PER + x, ay * PER + y);
-              if (this.mat[i] === WATER) this.mat[i] = STEAM;
+  // 像素對像素的反應（像 Noita）：熔岩像素碰到水像素 → 熔岩變成石頭、水變成蒸氣；
+  // 熔岩像素碰到冰像素 → 冰融化成水（下一幀就會和熔岩反應）。接觸面先結出一層石殼，石殼會隔開下面的熔岩
+  reactPixels() {
+    const N = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (let fy = 0; fy < FH; fy++) {
+      for (let fx = 0; fx < FW; fx++) {
+        const i = this.fi(fx, fy);
+        if (this.mat[i] !== LAVA) continue;
+        if (this.tTime[this.idx(fx >> 3, fy >> 3)] < 0.05) continue; // 時停的熔岩不會反應
+        for (const [dx, dy] of N) {
+          const nx = fx + dx;
+          const ny = fy + dy;
+          if (nx < 0 || nx >= FW || ny < 0 || ny >= FH) continue;
+          const j = this.fi(nx, ny);
+          if (this.mat[j] === WATER) {
+            // 熔岩變成石頭、水變成蒸氣；周圍一小圈的熔岩也一起冷卻，石殼才夠厚、站得上去
+            this.mat[j] = STEAM;
+            for (let oy = -2; oy <= 2; oy++) for (let ox = -2; ox <= 2; ox++) {
+              const cx = fx + ox;
+              const cy = fy + oy;
+              if (cx < 0 || cx >= FW || cy < 0 || cy >= FH) continue;
+              const k = this.fi(cx, cy);
+              if (this.mat[k] === LAVA) this.mat[k] = STONE;
             }
+            break;
           }
-          world.burst(tx * TILE + 8, ty * TILE + 8, '#bbbbbb', 12);
-        } else {
-          for (let y = 0; y < PER; y++) for (let x = 0; x < PER; x++) {
-            const i = this.fi(tx * PER + x, ty * PER + y);
-            if (this.mat[i] === WATER) this.mat[i] = STEAM;
-            else if (this.mat[i] === LAVA) this.mat[i] = EMPTY;
-          }
+          if (this.mat[j] === ICE) this.mat[j] = WATER;
         }
       }
     }
-    this.derive();
+  }
+
+  // 某個像素是否露在外面（旁邊不是冰、石頭或牆）
+  exposed(fx, fy) {
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = fx + dx;
+      const ny = fy + dy;
+      if (nx < 0 || nx >= FW || ny < 0 || ny >= FH) continue;
+      const j = this.fi(nx, ny);
+      if (!this.wall[j] && this.mat[j] !== ICE && this.mat[j] !== STONE) return true;
+    }
+    return false;
+  }
+
+  // 冰從露出的邊緣一個像素一個像素地融化成水（約 meltTime 秒融完一整格）
+  meltPixels(tx, ty, dt) {
+    const t = this.idx(tx, ty);
+    this.meltAcc[t] += (dt * CELLS_PER_TILE) / cfg.meltTime;
+    let n = Math.floor(this.meltAcc[t]);
+    this.meltAcc[t] -= n;
+    const edge = [];
+    for (let y = 0; y < PER; y++) for (let x = 0; x < PER; x++) {
+      const fx = tx * PER + x;
+      const fy = ty * PER + y;
+      if (this.mat[this.fi(fx, fy)] === ICE && this.exposed(fx, fy)) edge.push(this.fi(fx, fy));
+    }
+    for (const i of edge) { if (n-- <= 0) break; this.mat[i] = WATER; }
+  }
+
+  // 光線、火爐、熔岩照到冰牆格時呼叫（原版是整格一起融化，像素版從邊緣慢慢融）
+  heatTile(world, tx, ty, dt) {
+    this.meltPixels(tx, ty, dt * 1.5);
+  }
+
+  // 冷凍裝置：範圍內的水從表面（上方是空的）和貼著冰、石頭、牆的地方開始結冰，再慢慢往內長
+  freezePixels(dt) {
+    for (let ty = 0; ty < ROWS; ty++) {
+      for (let tx = 0; tx < COLS; tx++) {
+        const t = this.idx(tx, ty);
+        if (!this.tCold[t]) { this.freezeAcc[t] = 0; continue; }
+        this.freezeAcc[t] += (dt * CELLS_PER_TILE) / cfg.freezeTime;
+        let n = Math.floor(this.freezeAcc[t]);
+        this.freezeAcc[t] -= n;
+        if (!n) continue;
+        const ux = -this.tDown[t * 2] || 0;
+        const uy = -this.tDown[t * 2 + 1] || -1;
+        for (let y = 0; y < PER && n > 0; y++) for (let x = 0; x < PER && n > 0; x++) {
+          const fx = tx * PER + x;
+          const fy = ty * PER + y;
+          const i = this.fi(fx, fy);
+          if (this.mat[i] !== WATER) continue;
+          const ax = fx + ux;
+          const ay = fy + uy;
+          const surface = ax < 0 || ax >= FW || ay < 0 || ay >= FH || this.mat[this.fi(ax, ay)] === EMPTY || this.mat[this.fi(ax, ay)] === STEAM;
+          if (surface || !this.exposed(fx, fy) || this.touchesSolid(fx, fy)) { this.mat[i] = ICE; n--; }
+        }
+      }
+    }
+  }
+
+  touchesSolid(fx, fy) {
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = fx + dx;
+      const ny = fy + dy;
+      if (nx < 0 || nx >= FW || ny < 0 || ny >= FH) return true;
+      const j = this.fi(nx, ny);
+      if (this.wall[j] || this.mat[j] === ICE || this.mat[j] === STONE) return true;
+    }
+    return false;
+  }
+
+  // 依冰與石頭像素的數量決定整格是否對角色是實心的（超過半格才算）；
+  // 其他程式把整格設成冰或石頭時（例如熔岩塊碰到水、冷凍裝置讓熔岩凝固），補上對應的像素
+  syncSolids(world) {
+    this.iceN.fill(0);
+    this.stoneN.fill(0);
+    for (let fy = 0; fy < FH; fy++) for (let fx = 0; fx < FW; fx++) {
+      const m = this.mat[this.fi(fx, fy)];
+      if (m === ICE) this.iceN[this.idx(fx >> 3, fy >> 3)]++;
+      else if (m === STONE) this.stoneN[this.idx(fx >> 3, fy >> 3)]++;
+    }
+    for (let ty = 0; ty < ROWS; ty++) for (let tx = 0; tx < COLS; tx++) {
+      const t = this.idx(tx, ty);
+      const c = this.map.get(tx, ty);
+      const ice = this.iceN[t];
+      const stone = this.stoneN[t];
+      if (c === 'Q' && stone === 0) { this.fillSolid(tx, ty, STONE); continue; }
+      if (c === 'I' && ice === 0 && stone === 0) { this.fillSolid(tx, ty, ICE); continue; }
+      if (c === 'I' && ice < HALF) { this.map.set(tx, ty, ' '); continue; }
+      if (c === 'Q' && stone < QUARTER) { this.map.set(tx, ty, ' '); continue; }
+      if (c !== ' ' || this.occupied(world, tx, ty)) continue;
+      if (stone >= QUARTER) this.map.set(tx, ty, 'Q');
+      else if (ice >= HALF) this.map.set(tx, ty, 'I');
+    }
+  }
+
+  // 火爐和熔岩也會融化不到半格、已經不是實心的殘冰
+  meltRemnants(world, dt) {
+    const heaters = world.entities.filter((e) => e.isHeater && e.on && e.alive);
+    for (let ty = 0; ty < ROWS; ty++) for (let tx = 0; tx < COLS; tx++) {
+      const t = this.idx(tx, ty);
+      if (!this.iceN[t] || this.map.get(tx, ty) === 'I') continue;
+      const cx = tx * TILE + TILE / 2;
+      const cy = ty * TILE + TILE / 2;
+      if (heaters.some((h) => Math.hypot(cx - h.cx, cy - h.cy) <= cfg.heatRadius)) this.meltPixels(tx, ty, dt);
+    }
   }
 
   // 換算回每個大格的水量與蒸氣量；被時停的水格標記為實心
@@ -442,6 +552,16 @@ export class PixelWaterSystem extends WaterSystem {
           if (this.tTime[t] < 0.05) { W[o] = 150 + v; W[o + 1] = 215 + v; W[o + 2] = 250; W[o + 3] = 220; }
           else if (surface) { W[o] = 110 + v; W[o + 1] = 175 + v; W[o + 2] = 245; W[o + 3] = 235; }
           else { W[o] = 38 + v; W[o + 1] = 105 + v + ((n + shimmer) % 16 === 0 ? 20 : 0); W[o + 2] = 215 + v; W[o + 3] = 210; }
+        } else if (m === ICE) {
+          // 冰：淡藍色，露出的邊緣比較亮
+          const v = (n >> 4) - 8;
+          const edge = this.exposed(fx, fy);
+          W[o] = (edge ? 225 : 185) + v; W[o + 1] = (edge ? 245 : 225) + v; W[o + 2] = 255; W[o + 3] = 255;
+        } else if (m === STONE) {
+          // 石頭：深灰帶一點紅
+          const v = (n >> 4) - 8;
+          W[o] = 66 + v; W[o + 1] = 56 + v; W[o + 2] = 58 + v; W[o + 3] = 255;
+          if (n % 29 === 0) { W[o] = 150; W[o + 1] = 70; W[o + 2] = 45; }
         } else if (m === LAVA) {
           const v = (n >> 4) - 8;
           const ux = -this.tDown[t * 2] || 0;

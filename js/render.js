@@ -110,6 +110,8 @@ export class Renderer {
             ctx.fillStyle = C.tileTop;
             ctx.fillRect(x, y, TILE, 3);
           }
+        } else if ((c === 'I' || c === 'Q') && world.water.drawsSolids) {
+          // 像素版：冰和石頭由像素畫，這裡不畫整格
         } else if (c === 'I') {
           // 冰牆格：被光照時越來越紅、越亮
           const heat = Math.min(1, world.water.meltProgress(tx, ty));

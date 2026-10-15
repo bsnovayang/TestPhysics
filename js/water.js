@@ -406,7 +406,8 @@ export class WaterSystem {
         }
 
         // 冷凍裝置：範圍內的水慢慢結成冰牆格（有東西在那一格時不結冰）
-        const chilled = A[i] >= 0.5 && near(this.coolers, cfg.coldRadius);
+        // 像素版自己逐像素結冰（skipCellFreeze），這裡只處理整格結冰的版本
+        const chilled = !this.skipCellFreeze && A[i] >= 0.5 && near(this.coolers, cfg.coldRadius);
         if (!chilled) { this.cold[i] = 0; continue; }
         this.cold[i] += dt;
         if (this.cold[i] < cfg.freezeTime) continue;
