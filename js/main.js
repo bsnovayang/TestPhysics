@@ -2,7 +2,7 @@ import { cfg, STEP, SLOT_KEYS } from './config.js';
 import { Input } from './input.js';
 import { World } from './world.js';
 import { Renderer } from './render.js';
-import { SKILLS, SKILL_ORDER, TREE_COLORS } from './skills.js';
+import { SKILLS, SKILL_ORDER, DEBUG_KEYS, TREE_COLORS } from './skills.js';
 import { createDebugPanel } from './debug.js';
 
 const canvas = document.getElementById('game');
@@ -59,7 +59,7 @@ function buildLoadout() {
     const btn = document.createElement('button');
     btn.className = 'skill';
     btn.style.borderLeftColor = TREE_COLORS[sk.tree];
-    btn.innerHTML = `<small>${i + 1}</small>${sk.name}`;
+    btn.innerHTML = `<small>${DEBUG_KEYS[i].replace('Digit', '').replace('Minus', '-')}</small>${sk.name}`;
     btn.onclick = () => { world.loadout[selectedSlot] = id; buildLoadout(); };
     skillsEl.appendChild(btn);
   });
@@ -109,15 +109,13 @@ input.onKey((code) => {
       cfg.globalTimeScale = slowMo ? 0.25 : 1;
       world.toast(slowMo ? '整體慢動作 0.25x' : '恢復正常速度');
       break;
-    default:
-      if (code.startsWith('Digit')) {
-        const n = Number(code.slice(5));
-        const id = SKILL_ORDER[n - 1];
-        if (id) {
-          world.loadout[0] = id;
-          world.toast(`右鍵技能：${SKILLS[id].name}`);
-        }
+    default: {
+      const id = SKILL_ORDER[DEBUG_KEYS.indexOf(code)];
+      if (id) {
+        world.loadout[0] = id;
+        world.toast(`右鍵技能：${SKILLS[id].name}`);
       }
+    }
   }
 });
 

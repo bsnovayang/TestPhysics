@@ -1,5 +1,6 @@
 import { cfg } from './config.js';
 import { Field } from './fields.js';
+import { SKILLS } from './skills.js';
 
 const WEB_STEP = 4;
 
@@ -16,23 +17,63 @@ export class Web {
     this.alive = true;
   }
 
+  get isPortal() {
+    return SKILLS[this.skillId].type === 'portal';
+  }
+
   update(world, dt) {
     let remaining = cfg.webSpeed * dt;
     while (remaining > 0) {
       const dx = this.tx - this.x;
       const dy = this.ty - this.y;
       const dist = Math.hypot(dx, dy);
-      if (dist < 0.001) return this.expand(world);
+      if (dist < 0.001) return this.arrive(world);
       const step = Math.min(WEB_STEP, remaining, dist);
       const nx = this.x + (dx / dist) * step;
       const ny = this.y + (dy / dist) * step;
-      if (world.map.pointSolid(nx, ny)) return this.expand(world);
+
+      // 一般的網可以穿過傳送門，從出口繼續飛完剩下的距離
+      if (!this.isPortal) {
+        const cross = world.portals.crossSegment(this.x, this.y, nx, ny);
+        if (cross) {
+          const d = cross.rotate(dx / dist, dy / dist);
+          const left = dist - step;
+          this.x = cross.x;
+          this.y = cross.y;
+          this.tx = this.x + d.x * left;
+          this.ty = this.y + d.y * left;
+          remaining -= step;
+          continue;
+        }
+      }
+
+      if (world.map.pointSolid(nx, ny)) return this.hitWall(world, nx, ny);
       const hit = world.hitTest(nx, ny, 2);
-      if (hit) return this.expand(world, hit.isBody ? hit : null);
+      if (hit) return this.isPortal ? this.fail(world, '傳送門要開在牆面上') : this.expand(world, hit.isBody ? hit : null);
       this.x = nx;
       this.y = ny;
       remaining -= step;
     }
+  }
+
+  arrive(world) {
+    if (this.isPortal) return this.fail(world, '傳送門要開在牆面上');
+    this.expand(world);
+  }
+
+  hitWall(world, hx, hy) {
+    if (!this.isPortal) return this.expand(world);
+    const result = world.portals.place(world, this.x, this.y, hx, hy);
+    if (result.error) return this.fail(world, result.error);
+    world.burst(this.x, this.y, result.portal.color, 12);
+    this.alive = false;
+  }
+
+  fail(world, message) {
+    world.toast(message);
+    world.refundSkill();
+    world.burst(this.x, this.y, '#888888', 6);
+    this.alive = false;
   }
 
   expand(world, target = null) {
@@ -62,6 +103,15 @@ export class AirShot {
     for (let i = 0; i < steps; i++) {
       const nx = this.x + (this.dx * dist) / steps;
       const ny = this.y + (this.dy * dist) / steps;
+      const cross = world.portals.crossSegment(this.x, this.y, nx, ny);
+      if (cross) {
+        const d = cross.rotate(this.dx, this.dy);
+        this.x = cross.x;
+        this.y = cross.y;
+        this.dx = d.x;
+        this.dy = d.y;
+        continue;
+      }
       if (world.map.pointSolid(nx, ny)) {
         world.burst(this.x, this.y, '#cfe8ff', 4);
         this.alive = false;
@@ -111,7 +161,7 @@ export class Bullet {
     this.x += this.vx * ldt;
     this.y += this.vy * ldt;
     this.life -= ldt;
-    if (this.life <= 0 || world.map.rectSolid(this.x, this.y, this.w, this.h)) {
+    if (this.life <= 0 || world.solidTiles(this.x, this.y, this.w, this.h)) {
       this.alive = false;
       return;
     }

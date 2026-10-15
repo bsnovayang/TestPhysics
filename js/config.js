@@ -42,6 +42,12 @@ export const cfg = {
   selfAttachUnlocked: true, // 之後隨進度解鎖；原型預設開啟
   selfDrain: 25,            // 每秒消耗的 MP（啟動時另外扣一次一般消耗）
 
+  // 空間
+  blinkRange: 80,            // 約 5 格
+  blinkThroughWalls: false,  // 之後解鎖
+  portalDuration: 30,
+  portalMinExit: 150,        // 離開傳送門的最低速度，避免卡在門口
+
   // 空氣砲
   cannonRate: 4,         // 每秒發數
   cannonSpeed: 420,

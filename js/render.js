@@ -62,6 +62,7 @@ export class Renderer {
     this.drawGrid();
     this.drawFieldFills(world);
     this.drawTiles(world);
+    this.drawPortals(world);
     this.drawSwitchesAndDoors(world);
     for (const e of world.entities) this.drawEntity(world, e);
     this.drawPlayer(world);
@@ -112,6 +113,30 @@ export class Renderer {
     for (let tx = 0; tx < COLS; tx++) {
       if (map.get(tx, ROWS - 1) === '#') ctx.fillRect(tx * TILE, ROWS * TILE, TILE, VIEW_H - ROWS * TILE);
     }
+  }
+
+  // 傳送門：貼在牆面上的發光線。只有一個門（沒有作用）時畫得比較淡；快消失時閃爍
+  drawPortals(world) {
+    const ctx = this.ctx;
+    const active = world.portals.active;
+    for (const p of world.portals.list) {
+      if (p.life < 5 && Math.floor(world.time * 6) % 2 === 0) continue;
+      const alpha = active ? 1 : 0.45;
+      const len = p.s1 - p.s0;
+      // 光暈往空地那一側延伸
+      for (let i = 0; i < 3; i++) {
+        ctx.globalAlpha = alpha * (0.35 - i * 0.1);
+        ctx.fillStyle = p.color;
+        const depth = 3 + i * 3;
+        if (p.nx !== 0) ctx.fillRect(p.nx > 0 ? p.plane : p.plane - depth, p.s0, depth, len);
+        else ctx.fillRect(p.s0, p.ny > 0 ? p.plane : p.plane - depth, len, depth);
+      }
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = p.color;
+      if (p.nx !== 0) ctx.fillRect(p.plane - 1.5, p.s0, 3, len);
+      else ctx.fillRect(p.s0, p.plane - 1.5, len, 3);
+    }
+    ctx.globalAlpha = 1;
   }
 
   drawSpike(x, y, pointDown) {

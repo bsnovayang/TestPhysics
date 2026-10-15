@@ -16,12 +16,21 @@ export const SKILLS = {
   slow2:    { name: '強減速',   tree: 'time',    type: 'timeMult',    value: 0.2 },
   stop:     { name: '時停',     tree: 'time',    type: 'timeMult',    value: 0 },
   haste:    { name: '加速',     tree: 'time',    type: 'selfHaste',   value: 2, self: true },
+  blink:    { name: '閃現',     tree: 'space',   type: 'blink' },
+  portal:   { name: '傳送門',   tree: 'space',   type: 'portal' },
 };
 
-// 除錯用：數字鍵 1～9 對應的技能
-export const SKILL_ORDER = ['lowG', 'zeroG', 'reverseG', 'dirG', 'pointG', 'slow', 'slow2', 'stop', 'haste'];
+// 會展開場域的技能（可以附著）
+const FIELD_TYPES = new Set(['gravityMult', 'gravityDir', 'gravityPoint', 'timeMult']);
+export function isFieldSkill(skill) {
+  return FIELD_TYPES.has(skill.type);
+}
 
-export const DEFAULT_LOADOUT = ['lowG', 'reverseG', 'zeroG', 'stop', 'slow'];
+// 除錯用：數字鍵 1～9、0、- 依序對應的技能
+export const SKILL_ORDER = ['lowG', 'zeroG', 'reverseG', 'dirG', 'pointG', 'slow', 'slow2', 'stop', 'haste', 'blink', 'portal'];
+export const DEBUG_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus'];
+
+export const DEFAULT_LOADOUT = ['lowG', 'reverseG', 'stop', 'portal', 'blink'];
 
 export const TREE_COLORS = {
   gravity: '#a070ff',

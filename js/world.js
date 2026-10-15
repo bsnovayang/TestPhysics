@@ -1,7 +1,8 @@
 import { cfg, COLS, ROWS } from './config.js';
 import { TileMap } from './tilemap.js';
 import { Field, FieldSystem } from './fields.js';
-import { SKILLS, DEFAULT_LOADOUT } from './skills.js';
+import { SKILLS, DEFAULT_LOADOUT, isFieldSkill } from './skills.js';
+import { PortalSystem } from './portals.js';
 import { rectsOverlap } from './body.js';
 import { Player } from './player.js';
 import { Web } from './projectiles.js';
@@ -57,6 +58,7 @@ export class World {
     this.input = input;
     this.mouse = { x: 0, y: 0 };
     this.fields = new FieldSystem();
+    this.portals = new PortalSystem();
     this.player = new Player();
     this.loadout = [...DEFAULT_LOADOUT];
     this.particles = [];
@@ -78,6 +80,7 @@ export class World {
     this.spawn = parsed.spawn;
     this.projectiles = [];
     this.fields.clear();
+    this.portals.clear();
     this.player.respawn(this.spawn);
     this.pendingRoom = null;
     this.toast(this.room.name);
@@ -102,9 +105,24 @@ export class World {
     return rectsOverlap(a, b);
   }
 
+  // 會穿過傳送門的東西：所有物理物體與子彈
+  portalTravelers() {
+    const list = this.bodies();
+    for (const e of this.entities) if (e.isBullet && e.alive) list.push(e);
+    return list;
+  }
+
+  // 矩形是否碰到實心地形。傳送門所在的牆格，對塞得進門的物體視為空地，讓物體可以走進門裡
+  solidTiles(x, y, w, h) {
+    if (!this.map.rectSolid(x, y, w, h)) return false;
+    if (!this.portals.active) return true;
+    return this.map.anyTileInRect(x, y, w, h,
+      (tx, ty) => this.map.isSolid(tx, ty) && !this.portals.coversTile(tx, ty, x, y, w, h));
+  }
+
   // 碰撞查詢：回傳 'tile'、擋住的實心物件，或 null
   rectBlocked(x, y, w, h, self) {
-    if (this.map.rectSolid(x, y, w, h)) return 'tile';
+    if (this.solidTiles(x, y, w, h)) return 'tile';
     for (const e of this.entities) {
       if (e === self || !e.solid || !e.alive) continue;
       if (x < e.x + e.w && x + w > e.x && y < e.y + e.h && y + h > e.y) return e;
@@ -128,7 +146,7 @@ export class World {
     const skill = SKILLS[id];
     const cost = cfg.mpMax * cfg.mpCostRatio;
     const p = this.player;
-    const selfCast = !skill.self && this.isSelfCast();
+    const selfCast = isFieldSkill(skill) && this.isSelfCast();
     if (selfCast && !cfg.selfAttachUnlocked) {
       this.toast('尚未解鎖自身附著');
       return;
@@ -144,14 +162,20 @@ export class World {
       this.burst(p.cx, p.cy, '#4aa8ff', 14);
       return;
     }
+    if (skill.type === 'blink') {
+      this.blink();
+      return;
+    }
 
     const o = p.shoulder();
-    const end = this.clampToRange(o, this.mouse);
+    let end = this.clampToRange(o, this.mouse);
     const dx = end.x - o.x;
     const dy = end.y - o.y;
     const d = Math.hypot(dx, dy);
     // 游標太靠近自己時（例如對自己施放定向重力），方向改用面向
     const dir = d > 8 ? { x: dx / d, y: dy / d } : { x: p.facing, y: 0 };
+    // 傳送門：沿著瞄準方向飛到射程極限，直到撞到牆（不會停在游標位置）
+    if (skill.type === 'portal') end = { x: o.x + dir.x * cfg.webRange, y: o.y + dir.y * cfg.webRange };
 
     if (selfCast) {
       this.fields.add(new Field(p.cx, p.cy, id, dir, p, keyCode));
@@ -159,6 +183,38 @@ export class World {
       return;
     }
     this.projectiles.push(new Web(o.x, o.y, end.x, end.y, id, dir));
+  }
+
+  // 閃現：朝游標瞬間移動，保留原本的速度。不能穿牆時，停在路徑上最後一個空位
+  blink() {
+    const p = this.player;
+    const from = { x: p.cx, y: p.cy };
+    const dx = this.mouse.x - from.x;
+    const dy = this.mouse.y - from.y;
+    const d = Math.min(Math.hypot(dx, dy), cfg.blinkRange);
+    if (d < 1) return;
+    const ux = dx / Math.hypot(dx, dy);
+    const uy = dy / Math.hypot(dx, dy);
+    const free = (t) => !this.rectBlocked(from.x + ux * t - p.w / 2, from.y + uy * t - p.h / 2, p.w, p.h, p);
+
+    let best = 0;
+    if (cfg.blinkThroughWalls) {
+      for (let t = d; t > 0; t -= 2) if (free(t)) { best = t; break; }
+    } else {
+      for (let t = 2; t <= d; t += 2) {
+        if (!free(t)) break;
+        best = t;
+      }
+    }
+    this.burst(p.cx, p.cy, '#3ddc84', 10);
+    p.x = from.x + ux * best - p.w / 2;
+    p.y = from.y + uy * best - p.h / 2;
+    this.burst(p.cx, p.cy, '#3ddc84', 10);
+  }
+
+  // 技能失敗時退回 MP
+  refundSkill() {
+    this.player.mp = Math.min(cfg.mpMax, this.player.mp + cfg.mpMax * cfg.mpCostRatio);
   }
 
   // 維持型場域：放開按鍵或 MP 耗盡時結束
@@ -261,12 +317,14 @@ export class World {
   update(dt) {
     this.time += dt;
     this.fields.update(dt);
+    this.portals.update(dt, this);
     this.player.update(this, dt);
     this.updateChannels(dt);
 
     if (this.pendingRoom === null) {
       for (const e of this.entities) if (e.alive) e.update(this, dt);
       for (const p of this.projectiles) if (p.alive) p.update(this, dt);
+      for (const b of this.portalTravelers()) this.portals.tryTeleport(this, b);
       this.updateSwitches();
     }
 

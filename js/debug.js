@@ -46,6 +46,12 @@ export async function createDebugPanel() {
   field.add(cfg, 'webRange', 32, 400, 4).name('網的射程');
   field.add(cfg, 'webSpeed', 100, 1200, 20).name('網的速度');
 
+  const space = gui.addFolder('空間');
+  space.add(cfg, 'blinkRange', 16, 320, 4).name('閃現距離');
+  space.add(cfg, 'blinkThroughWalls').name('閃現可穿牆');
+  space.add(cfg, 'portalDuration', 5, 120, 5).name('傳送門持續時間');
+  space.add(cfg, 'portalMinExit', 0, 400, 10).name('出口最低速度');
+
   const cannon = gui.addFolder('空氣砲');
   cannon.add(cfg, 'cannonRate', 1, 15, 0.5).name('每秒發數');
   cannon.add(cfg, 'cannonImpulse', 0, 800, 10).name('擊退力');
