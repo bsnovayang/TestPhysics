@@ -481,6 +481,70 @@ export class Renderer {
 
   drawEntity(world, e) {
     const ctx = this.ctx;
+    if (e.isLavaBlob) {
+      // 飛行中的熔岩塊；被時停時畫成暗紅色並加框（可以站、不燙）
+      const frozen = e.time < 0.05;
+      ctx.fillStyle = frozen ? '#6b2a1c' : '#ff6a2a';
+      ctx.beginPath();
+      ctx.arc(e.cx, e.cy, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      if (frozen) {
+        ctx.strokeStyle = 'rgba(200,240,255,0.7)';
+        ctx.strokeRect(e.x - 0.5, e.y - 0.5, e.w + 1, e.h + 1);
+      } else {
+        ctx.fillStyle = 'rgba(255,220,120,0.9)';
+        ctx.fillRect(e.cx - 1, e.cy - 2, 2, 2);
+      }
+      return;
+    }
+    if (e.isBomb) {
+      // 火山彈：黑色石塊帶橘色裂紋
+      ctx.save();
+      ctx.translate(e.cx, e.cy);
+      ctx.rotate(e.spin);
+      ctx.fillStyle = '#2b2426';
+      ctx.fillRect(-4, -4, 8, 8);
+      ctx.strokeStyle = '#ff8a3d';
+      ctx.beginPath();
+      ctx.moveTo(-3, -1); ctx.lineTo(1, 1); ctx.lineTo(3, -2);
+      ctx.stroke();
+      ctx.restore();
+      if (e.time < 0.05) this.timeTint(e);
+      return;
+    }
+    if (e.isVent) {
+      // 噴發口：火山口的形狀，預兆時越來越亮
+      const glow = e.state === 'warn' ? 1 - e.timer / cfg.ventWarn : e.state === 'erupt' ? 1 : 0.15;
+      ctx.fillStyle = '#3a2a26';
+      ctx.beginPath();
+      ctx.moveTo(e.x - 2, e.y + e.h);
+      ctx.lineTo(e.x + 4, e.y + 4);
+      ctx.lineTo(e.x + e.w - 4, e.y + 4);
+      ctx.lineTo(e.x + e.w + 2, e.y + e.h);
+      ctx.fill();
+      ctx.fillStyle = `rgba(255,${Math.round(90 + glow * 120)},40,${0.4 + glow * 0.6})`;
+      ctx.fillRect(e.x + 5, e.y + 3, e.w - 10, 3);
+      if (e.blocked) {
+        ctx.fillStyle = '#7d869a';
+        ctx.font = `7px ${FONT}`;
+        ctx.textAlign = 'center';
+        ctx.fillText('封住', e.cx, e.y - 2);
+        ctx.textAlign = 'left';
+      }
+      return;
+    }
+    if (e.isSource) {
+      // 液體源：牆上的出水口，開啟時有液體流出的顏色
+      ctx.fillStyle = '#3b4250';
+      ctx.fillRect(e.x, e.y, e.w, e.h);
+      const color = e.liquid === 'lava' ? '#ff6a2a' : '#4aa8ff';
+      ctx.fillStyle = e.on ? color : '#5a5f6b';
+      const d = e.dir ?? { x: 0, y: 1 };
+      ctx.fillRect(e.cx + d.x * 5 - 3, e.cy + d.y * 5 - 3, 6, 6);
+      ctx.strokeStyle = color;
+      ctx.strokeRect(e.x + 0.5, e.y + 0.5, e.w - 1, e.h - 1);
+      return;
+    }
     if (e.isHeater) {
       // 火爐：點燃時顯示範圍和發紅的爐口；熄滅時爐口是暗灰色
       if (e.on) {

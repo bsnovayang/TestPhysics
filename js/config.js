@@ -71,6 +71,18 @@ export const cfg = {
   swimCooldown: 0.25,
   iceFriction: 0.12,         // 冰面上的抓地力（倍率）
   heatRadius: 40,            // 火爐的範圍
+  // 火山
+  ventInterval: 4,           // 噴發口兩次噴發之間的安靜時間
+  ventWarn: 1,               // 噴發前的預兆時間
+  ventDuration: 0.8,         // 噴發持續時間
+  ventSpeed: 560,            // 熔岩塊噴出的速度（約可噴到 10 格高）
+  ventBombs: 2,              // 每次噴發拋出的火山彈
+  ventDrain: 0.8,            // 噴發口把周圍熔岩吸回去的速度
+  blobLava: 0.015,           // 每塊熔岩落地變成多少熔岩
+  blobDamage: 2,
+  bombDamage: 2,
+  lavaSourceRate: 0.15,      // 熔岩源每秒流出的量
+  waterSourceRate: 1.5,      // 水源每秒流出的量
   lavaFlow: 0.2,             // 熔岩每一步往下流的比例（水是 1，熔岩很黏）
   lavaSpread: 10,            // 熔岩往兩側擴散的除數（越大散得越少）
   boilTime: 1,               // 水被加熱多久開始沸騰（加熱強度 1 時）

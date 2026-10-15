@@ -10,6 +10,7 @@ import { Box, BoxSpawner, MovingPlatform, Blade, Crusher, Switch, FixedJammer, M
 import { WaterSystem } from './water.js';
 import { Walker, Heavy, Jumper, Flyer, Turret, LaserEnemy } from './enemies.js';
 import { Emitter, MirrorBox } from './light.js';
+import { Vent, LiquidSource } from './volcano.js';
 
 // 干擾裝置的地圖字元：1～4 固定、5～8 可移動，依序為 重力、時間、空間、全部
 const JAMMER_KINDS = ['gravity', 'time', 'space', 'all'];
@@ -35,6 +36,9 @@ function parseRoom(def) {
         case 'B': entities.push(new Box(tx, ty)); break;
         case 'K': entities.push(new Box(tx, ty, true)); break;
         case '@': entities.push(new BoxSpawner(tx, ty)); break;
+        case '!': entities.push(new Vent(tx, ty)); break;
+        case '&': entities.push(new LiquidSource(tx, ty, 'lava', true)); break;
+        case '$': entities.push(new LiquidSource(tx, ty, 'water', false)); break;
         case 'M': entities.push(new MirrorBox(tx, ty)); break;
         case '~': water.push({ tx, ty }); break;
         case '%': grid[ty][tx] = '^'; water.push({ tx, ty }); continue; // 泡在水裡的尖刺
@@ -108,6 +112,9 @@ export class World {
     this.map = new TileMap(parsed.rows);
     this.water = this.createWater(this.map);
     for (const c of parsed.water) this.water.add(c.tx, c.ty, 1);
+    // 熔岩的基準量：噴發口只會把超過這個量的熔岩吸回去；上升的熔岩會提高基準量
+    this.lavaBaseline = this.water.lava.reduce((a, b) => a + b, 0);
+    this.riseT = 0;
     this.entities = parsed.entities;
     this.switches = parsed.switches;
     this.doorTiles = this.map.doorTiles();
@@ -126,6 +133,27 @@ export class World {
 
   resetRoom() {
     this.requestRoom(this.roomIndex);
+  }
+
+  // 上升的熔岩（房間設定 risingLava：{ delay 秒後開始, rowsPerSec 每秒上升幾格, topRow 最高到第幾列 }）。
+  // 只從已經有熔岩的地方往上、往旁邊長，不會憑空填滿封閉的空間
+  updateRisingLava(dt) {
+    const rise = this.room.risingLava;
+    if (!rise) return;
+    this.riseT += dt;
+    if (this.riseT < rise.delay) return;
+    const level = Math.max(rise.topRow, ROWS - 1 - Math.floor((this.riseT - rise.delay) * rise.rowsPerSec));
+    const w = this.water;
+    for (let ty = ROWS - 1; ty >= level; ty--) {
+      for (let tx = 0; tx < COLS; tx++) {
+        if (this.map.isSolid(tx, ty) || w.lavaAt(tx, ty) >= 0.95) continue;
+        const near = w.lavaAt(tx, ty) > 0.05 || w.lavaAt(tx - 1, ty) > 0.5 || w.lavaAt(tx + 1, ty) > 0.5 || w.lavaAt(tx, ty + 1) > 0.5;
+        if (!near) continue;
+        const before = w.lavaAt(tx, ty);
+        w.addLava(tx, ty, 0.8 * dt);
+        this.lavaBaseline += w.lavaAt(tx, ty) - before;
+      }
+    }
   }
 
   // 玩家與所有受物理影響的物體
@@ -371,6 +399,7 @@ export class World {
     this.beams = [];
     for (const s of this.switches) s.lit = false;
     this.fields.update(dt);
+    this.updateRisingLava(dt);
     this.water.update(this, dt);
     this.portals.update(dt, this);
     this.player.update(this, dt);

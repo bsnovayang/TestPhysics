@@ -97,6 +97,29 @@ export class PixelWaterSystem extends WaterSystem {
     this.amount[t] += n / CELLS_PER_TILE;
   }
 
+  addLava(tx, ty, a) {
+    if (!this.inBounds(tx, ty) || this.blocked(tx, ty)) return;
+    const t = this.idx(tx, ty);
+    this.lavaFrac = this.lavaFrac || new Float32Array(COLS * ROWS);
+    this.lavaFrac[t] += a * CELLS_PER_TILE;
+    const n = Math.floor(this.lavaFrac[t]);
+    this.lavaFrac[t] -= n;
+    const placed = this.fillTile(tx, ty, LAVA, n);
+    this.lava[t] += placed / CELLS_PER_TILE;
+  }
+
+  takeLava(tx, ty, a) {
+    if (!this.inBounds(tx, ty)) return 0;
+    let n = Math.round(a * CELLS_PER_TILE);
+    let taken = 0;
+    for (let y = 0; y < PER && n > 0; y++) for (let x = 0; x < PER && n > 0; x++) {
+      const i = this.fi(tx * PER + x, ty * PER + y);
+      if (this.mat[i] === LAVA) { this.mat[i] = EMPTY; n--; taken++; }
+    }
+    this.lava[this.idx(tx, ty)] = Math.max(0, this.lava[this.idx(tx, ty)] - taken / CELLS_PER_TILE);
+    return taken / CELLS_PER_TILE;
+  }
+
   addSteam(tx, ty, s) {
     if (!this.inBounds(tx, ty) || this.blocked(tx, ty)) return;
     const placed = this.fillTile(tx, ty, STEAM, Math.round((s * CELLS_PER_TILE) / STEAM_EXPANSION));

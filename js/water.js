@@ -104,6 +104,20 @@ export class WaterSystem {
     if (this.inBounds(tx, ty) && !this.blocked(tx, ty)) this.steam[this.idx(tx, ty)] = Math.min(1, this.steam[this.idx(tx, ty)] + s);
   }
 
+  // 加入熔岩（噴發口落下的熔岩塊、熔岩源、上升的熔岩）
+  addLava(tx, ty, a) {
+    if (this.inBounds(tx, ty) && !this.blocked(tx, ty)) this.lava[this.idx(tx, ty)] = Math.min(1, this.lava[this.idx(tx, ty)] + a);
+  }
+
+  // 把熔岩移除（噴發口會把周圍的熔岩吸回去）
+  takeLava(tx, ty, a) {
+    if (!this.inBounds(tx, ty)) return 0;
+    const i = this.idx(tx, ty);
+    const f = Math.min(this.lava[i], a);
+    this.lava[i] -= f;
+    return f;
+  }
+
   add(tx, ty, a) {
     if (this.inBounds(tx, ty) && !this.blocked(tx, ty)) this.amount[this.idx(tx, ty)] += a;
   }
