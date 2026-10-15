@@ -115,6 +115,7 @@ export class World {
     // 熔岩的基準量：噴發口只會把超過這個量的熔岩吸回去；上升的熔岩會提高基準量
     this.lavaBaseline = this.water.lava.reduce((a, b) => a + b, 0);
     this.riseT = 0;
+    this.computeLiquidBudget();
     this.entities = parsed.entities;
     this.switches = parsed.switches;
     this.doorTiles = this.map.doorTiles();
@@ -135,6 +136,44 @@ export class World {
     this.requestRoom(this.roomIndex);
   }
 
+  // 液體的總量上限：熔岩源、噴發落下的熔岩、上升的熔岩、水源都不能讓房間裡的液體超過上限，
+  // 否則熔岩源一直流、噴發口又被封住時，熔岩會無限增加（實測：放著不動 2 分鐘就從 21 增加到 39）
+  computeLiquidBudget() {
+    const sum = (a) => a.reduce((x, y) => x + y, 0);
+    // 上升的熔岩只會加一次：剛好填滿 topRow 以下的空間
+    this.riseBudget = 0;
+    this.riseAdded = 0;
+    const rise = this.room.risingLava;
+    if (rise) {
+      for (let ty = rise.topRow; ty < ROWS; ty++) {
+        for (let tx = 0; tx < COLS; tx++) if (!this.map.isSolid(tx, ty)) this.riseBudget += 1 - this.water.lavaAt(tx, ty);
+      }
+    }
+    this.lavaCap = sum(this.water.lava) + this.riseBudget + cfg.lavaMargin;
+    this.waterCap = sum(this.water.amount) + cfg.waterMargin;
+  }
+
+  lavaTotal() {
+    return this.water.lava.reduce((a, b) => a + b, 0);
+  }
+
+  waterTotal() {
+    return this.water.amount.reduce((a, b) => a + b, 0);
+  }
+
+  // 加熔岩（會受總量上限限制）；回傳是否有加
+  addLavaCapped(tx, ty, a) {
+    if (this.lavaTotal() + a > this.lavaCap) return false;
+    this.water.addLava(tx, ty, a);
+    return true;
+  }
+
+  addWaterCapped(tx, ty, a) {
+    if (this.waterTotal() + a > this.waterCap) return false;
+    this.water.add(tx, ty, a);
+    return true;
+  }
+
   // 上升的熔岩（房間設定 risingLava：{ delay 秒後開始, rowsPerSec 每秒上升幾格, topRow 最高到第幾列 }）。
   // 只從已經有熔岩的地方往上、往旁邊長，不會憑空填滿封閉的空間
   updateRisingLava(dt) {
@@ -146,12 +185,15 @@ export class World {
     const w = this.water;
     for (let ty = ROWS - 1; ty >= level; ty--) {
       for (let tx = 0; tx < COLS; tx++) {
+        if (this.riseAdded >= this.riseBudget) return; // 只上升一次，加滿預算就停
         if (this.map.isSolid(tx, ty) || w.lavaAt(tx, ty) >= 0.95) continue;
         const near = w.lavaAt(tx, ty) > 0.05 || w.lavaAt(tx - 1, ty) > 0.5 || w.lavaAt(tx + 1, ty) > 0.5 || w.lavaAt(tx, ty + 1) > 0.5;
         if (!near) continue;
         const before = w.lavaAt(tx, ty);
-        w.addLava(tx, ty, 0.8 * dt);
-        this.lavaBaseline += w.lavaAt(tx, ty) - before;
+        if (!this.addLavaCapped(tx, ty, 0.8 * dt)) return;
+        const added = w.lavaAt(tx, ty) - before;
+        this.lavaBaseline += added;
+        this.riseAdded += added;
       }
     }
   }

@@ -545,7 +545,7 @@ export class Renderer {
       const d = e.dir ?? { x: 0, y: 1 };
       ctx.fillRect(e.cx + d.x * 5 - 3, e.cy + d.y * 5 - 3, 6, 6);
       // 開啟時畫出流出去的液柱：從出口往下，直到碰到地面或液面；關閉時就沒有，一眼看得出狀態
-      if (e.on) {
+      if (e.on && !e.full) {
         const sx = e.cx + d.x * 10;
         let sy = e.cy + d.y * 10;
         const y0 = sy;

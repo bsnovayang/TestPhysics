@@ -83,6 +83,8 @@ export const cfg = {
   bombDamage: 2,
   lavaSourceRate: 0.15,      // 熔岩源每秒流出的量
   waterSourceRate: 1.5,      // 水源每秒流出的量
+  lavaMargin: 8,             // 房間熔岩總量上限 = 一開始的量 + 上升熔岩的量 + 這個值
+  waterMargin: 40,           // 房間水總量上限 = 一開始的量 + 這個值
   lavaFlow: 0.2,             // 熔岩每一步往下流的比例（水是 1，熔岩很黏）
   lavaSpread: 10,            // 熔岩往兩側擴散的除數（越大散得越少）
   boilTime: 1,               // 水被加熱多久開始沸騰（加熱強度 1 時）

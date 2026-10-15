@@ -60,8 +60,8 @@ export class LavaBlob {
       return;
     }
     if (solidAt(world, nx, ny) || this.life <= 0) {
-      // 落地：變回熔岩液體
-      world.water.addLava(tx, ty, cfg.blobLava);
+      // 落地：變回熔岩液體（房間的熔岩已達上限時就直接冷卻消失）
+      world.addLavaCapped(tx, ty, cfg.blobLava);
       this.alive = false;
       return;
     }
@@ -153,7 +153,7 @@ export class VolcanicBomb {
 
   explode(world, tx, ty) {
     this.alive = false;
-    world.water.addLava(tx, ty, cfg.blobLava * 2);
+    world.addLavaCapped(tx, ty, cfg.blobLava * 2);
     world.burst(this.cx, this.cy, '#ff8a3d', 14);
   }
 
@@ -266,8 +266,8 @@ export class LiquidSource {
     const oy = this.ty + this.dir.y;
     if (world.map.isSolid(ox, oy)) return; // 出口被封住
     const rate = (this.liquid === 'lava' ? cfg.lavaSourceRate : cfg.waterSourceRate) * dt;
-    if (this.liquid === 'lava') world.water.addLava(ox, oy, rate);
-    else world.water.add(ox, oy, rate);
+    // 房間裡的液體達到上限時暫停（不會無限流出）
+    this.full = !(this.liquid === 'lava' ? world.addLavaCapped(ox, oy, rate) : world.addWaterCapped(ox, oy, rate));
   }
 
   onAirShot(world) {
