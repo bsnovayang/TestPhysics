@@ -65,7 +65,9 @@ export class Renderer {
     this.drawGrid();
     this.drawFieldFills(world);
     this.drawTiles(world);
-    this.drawWater(world);
+    // 實驗版本可以自訂水的畫法（粒子水），或在原本的水上加特效
+    if (!world.water.draw?.(this.ctx, world)) this.drawWater(world);
+    this.fx?.draw(this.ctx, world);
     this.drawPortals(world);
     this.drawSwitchesAndDoors(world);
     this.drawJammerRanges(world);
@@ -983,6 +985,7 @@ export class Renderer {
     ctx.font = `8px ${FONT}`;
     ctx.fillStyle = C.dim;
     ctx.fillText('H：操作說明　Tab：裝備', 6, 40);
+    if (this.versionLabel) ctx.fillText('水：' + this.versionLabel, 6, 52);
     ctx.textBaseline = 'alphabetic';
   }
 

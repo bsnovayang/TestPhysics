@@ -82,7 +82,9 @@ function parseRoom(def) {
 }
 
 export class World {
-  constructor(input) {
+  // options.createWater：建立水系統的函式（實驗版本可以換成粒子水）
+  constructor(input, options = {}) {
+    this.createWater = options.createWater ?? ((map) => new WaterSystem(map));
     this.input = input;
     this.mouse = { x: 0, y: 0 };
     this.fields = new FieldSystem();
@@ -104,7 +106,7 @@ export class World {
     this.roomIndex = ((index % ROOMS.length) + ROOMS.length) % ROOMS.length;
     const parsed = parseRoom(this.room);
     this.map = new TileMap(parsed.rows);
-    this.water = new WaterSystem(this.map);
+    this.water = this.createWater(this.map);
     for (const c of parsed.water) this.water.add(c.tx, c.ty, 1);
     this.entities = parsed.entities;
     this.switches = parsed.switches;

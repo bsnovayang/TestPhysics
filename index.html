@@ -34,6 +34,9 @@
     #help { background: transparent; pointer-events: none; justify-content: flex-start; align-items: flex-start; }
     #help .panel { pointer-events: auto; margin: 16px; max-width: 420px; }
     .cast { margin-top: 4px; text-align: left; }
+    .versions a { display: inline-block; margin: 0 6px; padding: 4px 10px; border: 1px solid #2a3142; border-radius: 4px; color: var(--text); text-decoration: none; }
+    .versions a:hover { background: #252d3f; }
+    .versions a.current { border-color: var(--accent); color: var(--accent); }
     td b { color: #ffd34d; font-weight: normal; }
     .grid { display: flex; flex-wrap: wrap; gap: 6px; }
     .grid button { font: inherit; color: var(--text); background: #1c2230; border: 1px solid #2a3142;
@@ -62,6 +65,8 @@
         <tr><td>游標指向自己<br>（或按住 C）</td><td><b>長按</b>：場域附著在自己身上，持續消耗 MP，放開就結束</td></tr>
       </table>
       <p>遊戲中按 H 可以隨時查看說明。</p>
+      <h2>水的版本（比較用）</h2>
+      <p id="versions" class="versions"></p>
       <p class="big">點擊開始</p>
     </div>
   </div>

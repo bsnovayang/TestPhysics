@@ -5,11 +5,23 @@ import { Renderer } from './render.js';
 import { SKILLS, SKILL_ORDER, DEBUG_KEYS, TREE_COLORS } from './skills.js';
 import { createDebugPanel } from './debug.js';
 
+// 水的版本：?water=particle（粒子版）、?water=fx（原版＋粒子特效），預設為原版（格子水）
+const WATER_VERSIONS = {
+  cell: { name: '原版（格子水）' },
+  particle: { name: '粒子版', module: '../experiments/particle-water/particle-water.js' },
+  fx: { name: '原版＋粒子特效', module: '../experiments/water-fx/water-fx.js' },
+};
+const waterMode = WATER_VERSIONS[new URLSearchParams(location.search).get('water')] ? new URLSearchParams(location.search).get('water') : 'cell';
+const waterModule = WATER_VERSIONS[waterMode].module ? await import(WATER_VERSIONS[waterMode].module) : {};
+
 const canvas = document.getElementById('game');
 const input = new Input();
 input.attach(canvas);
 const renderer = new Renderer(canvas);
-const world = new World(input);
+const world = new World(input, { createWater: waterModule.createWater });
+if (waterModule.createFx) renderer.fx = waterModule.createFx();
+renderer.versionLabel = WATER_VERSIONS[waterMode].name;
+buildVersionLinks();
 window.world = world; // 方便在主控台除錯
 
 const overlays = {
@@ -123,6 +135,22 @@ input.onKey((code) => {
   }
 });
 
+// 開始畫面的版本切換連結（保留其他網址參數）
+function buildVersionLinks() {
+  const box = document.getElementById('versions');
+  if (!box) return;
+  for (const [key, v] of Object.entries(WATER_VERSIONS)) {
+    const p = new URLSearchParams(location.search);
+    if (key === 'cell') p.delete('water'); else p.set('water', key);
+    const a = document.createElement('a');
+    a.href = '?' + p.toString();
+    a.textContent = v.name;
+    if (key === waterMode) a.className = 'current';
+    a.addEventListener('click', (e) => e.stopPropagation());
+    box.appendChild(a);
+  }
+}
+
 // 除錯：按住 B 在游標位置噴蒸氣、按住 N 倒水
 function debugSpawn() {
   const tx = Math.floor(world.mouse.x / 16);
@@ -150,6 +178,7 @@ function frame(now) {
     while (acc >= STEP && steps < 5) {
       debugSpawn();
       world.update(STEP);
+      renderer.fx?.update(world, STEP);
       input.endStep();
       acc -= STEP;
       steps++;
