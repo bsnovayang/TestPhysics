@@ -73,7 +73,7 @@ export class Renderer {
     this.drawJammerRanges(world);
     for (const e of world.entities) this.drawEntity(world, e);
     this.drawPlayer(world);
-    this.drawSteam(world);
+    if (world.water.drawSteamLayer) world.water.drawSteamLayer(this.ctx); else this.drawSteam(world);
     this.drawBeams(world);
     this.drawProjectiles(world);
     this.drawParticles(world);

@@ -5,11 +5,12 @@ import { Renderer } from './render.js';
 import { SKILLS, SKILL_ORDER, DEBUG_KEYS, TREE_COLORS } from './skills.js';
 import { createDebugPanel } from './debug.js';
 
-// 水的版本：?water=particle（粒子版）、?water=fx（原版＋粒子特效），預設為原版（格子水）
+// 水的版本：?water=particle（粒子版）、?water=fx（原版＋粒子特效）、?water=pixel（Noita 風像素水），預設為原版（格子水）
 const WATER_VERSIONS = {
   cell: { name: '原版（格子水）' },
   particle: { name: '粒子版', module: '../experiments/particle-water/particle-water.js' },
   fx: { name: '原版＋粒子特效', module: '../experiments/water-fx/water-fx.js' },
+  pixel: { name: 'Noita 風像素水', module: '../experiments/pixel-water/pixel-water.js' },
 };
 const waterMode = WATER_VERSIONS[new URLSearchParams(location.search).get('water')] ? new URLSearchParams(location.search).get('water') : 'cell';
 const waterModule = WATER_VERSIONS[waterMode].module ? await import(WATER_VERSIONS[waterMode].module) : {};

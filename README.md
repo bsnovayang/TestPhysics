@@ -13,7 +13,7 @@ ES Modules 必須透過 HTTP 載入，不能直接雙擊 `index.html`。
 
 開發用網址參數：`?autostart` 跳過開始畫面，`?room=N` 直接進入第 N 個房間。
 
-## 水的三種版本（比較用）
+## 水的四種版本（比較用）
 
 開始畫面可以直接切換，或使用下列網址：
 
@@ -22,6 +22,7 @@ ES Modules 必須透過 HTTP 載入，不能直接雙擊 `index.html`。
 | 原版（格子水） | `index.html` | 每一格存一個水量，流動可預測 |
 | 粒子版 | `index.html?water=particle` 或 `experiments/particle-water/` | 用粒子模擬水流，再換算回格子，其他系統直接沿用 |
 | 原版＋粒子特效 | `index.html?water=fx` 或 `experiments/water-fx/` | 運作和原版相同，畫面加上水珠、水花、水面波紋 |
+| Noita 風像素水 | `index.html?water=pixel` 或 `experiments/pixel-water/` | 落沙模擬：每 2×2 px 一格，水和蒸氣都是像素 |
 
 建議在房間 G（冰與水）和 H（蒸氣）比較，也可以按住 N 倒水、B 噴蒸氣。
 
