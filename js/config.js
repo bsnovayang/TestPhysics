@@ -45,11 +45,10 @@ export const cfg = {
   selfDrain: 25,            // 每秒消耗的 MP（啟動時另外扣一次一般消耗）
 
   // 重力抓取與時間倒轉
-  grabRange: 160,        // 抓取的距離（和網的射程相同）
-  grabMaxMass: 3,        // 抓得起來的最大質量：木箱 1、鐵塊 2 可以；重裝兵 5、重壓兵 8 太重
+  grabLevel: 1,          // 重力抓取的等級（1～3，見 GRAB_LEVELS）；之後由技能樹升級
   grabDrain: 15,         // 抓住時每秒消耗的 MP
   grabSpeed: 420,        // 被抓住的物體追向游標的最高速度（放開時保留，所以可以丟出去）
-  rewindTime: 5,         // 時間倒轉最多倒回幾秒
+  rewindTime: 8,         // 時間倒轉最多倒回幾秒
   rewindSpeed: 2,        // 倒轉播放的速度（倍）
 
   // 空間
@@ -118,7 +117,7 @@ export const cfg = {
   impactPerDamage: 50,   // 超過門檻每多少 px/s 算 1 點傷害
   impactRestitution: 0.3,
   stasisImpact: 200,     // 被時停的物體被撞的速度超過這個值，撞擊的力也會累積起來（時停結束時一次釋放）
-  ironBreak: 400,        // 鐵塊撞牆或地面的速度超過這個值就碎掉（撞到敵人造成傷害時一定碎）
+  ironBreak: 520,        // 鐵塊撞牆或地面的速度超過這個值就碎掉（撞到敵人造成傷害時一定碎）；約等於從 9 格高掉下來
 
   // 物件
   boxFriction: 900,
@@ -130,6 +129,15 @@ export const cfg = {
   globalTimeScale: 1,
   godMode: false,        // 玩家無敵（尖刺、掉落仍會回到入口）
   showHitboxes: false,
+};
+
+// 重力抓取的等級
+//   range：抓得到的距離（從肩膀到物體最近的邊）；maxMass：抓得起來的最大質量（木箱 1、鐵塊 2、重裝兵 5）
+//   carry：true 時物體固定在角色面前，跟著角色走，游標只決定在角色周圍的哪個方向（Lv1）；false 時物體跟著游標移動
+export const GRAB_LEVELS = {
+  1: { range: 32, maxMass: 1, carry: true },
+  2: { range: 80, maxMass: 2, carry: false },
+  3: { range: 160, maxMass: 3, carry: false },
 };
 
 // 技能欄對應的按鍵（POE 式快捷鍵）

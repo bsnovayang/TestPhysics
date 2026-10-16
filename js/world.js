@@ -1,4 +1,11 @@
-import { cfg, COLS, ROWS, STEP } from './config.js';
+import { cfg, COLS, ROWS, STEP, GRAB_LEVELS } from './config.js';
+
+// 點到矩形最近的距離
+function distToRect(x, y, r) {
+  const dx = Math.max(r.x - x, 0, x - (r.x + r.w));
+  const dy = Math.max(r.y - y, 0, y - (r.y + r.h));
+  return Math.hypot(dx, dy);
+}
 import { TileMap } from './tilemap.js';
 import { Field, FieldSystem } from './fields.js';
 import { SKILLS, DEFAULT_LOADOUT, isFieldSkill } from './skills.js';
@@ -246,6 +253,7 @@ export class World {
     if (this.water?.frozenOverlap(x, y, w, h, self)) return 'tile'; // 被時停的水是實心的
     for (const e of this.entities) {
       if (e === self || !e.solid || !e.alive) continue;
+      if (e.held && self === this.player) continue; // 自己抓著的東西不會擋住自己
       if (x < e.x + e.w && x + w > e.x && y < e.y + e.h && y + h > e.y) return e;
     }
     return null;
@@ -345,8 +353,9 @@ export class World {
     const t = this.entities.find((e) => e.isBody && e.alive && !e.isBoss
       && this.mouse.x > e.x - 4 && this.mouse.x < e.x + e.w + 4 && this.mouse.y > e.y - 4 && this.mouse.y < e.y + e.h + 4);
     if (!t) { this.toast('游標下沒有可以抓的東西'); return false; }
-    if (Math.hypot(t.cx - o.x, t.cy - o.y) > cfg.grabRange) { this.toast('太遠了'); return false; }
-    if (t.mass > cfg.grabMaxMass) { this.toast('太重了，抓不起來'); return false; }
+    const lv = GRAB_LEVELS[cfg.grabLevel] ?? GRAB_LEVELS[1];
+    if (distToRect(o.x, o.y, t) > lv.range) { this.toast(lv.carry ? '要靠近一點才抓得到' : '太遠了'); return false; }
+    if (t.mass > lv.maxMass) { this.toast('太重了，抓不起來'); return false; }
     if (t === p.groundBody) { this.toast('不能抓自己腳下的東西'); return false; }
     if (this.fields.jammedAt(t.cx, t.cy, 'gravity')) { this.toast('重力被干擾，抓不起來'); return false; }
     // 中間不能被牆擋住
@@ -384,10 +393,16 @@ export class World {
     p.mp -= cfg.grabDrain * dt;
     if (p.mp <= 0) { p.mp = 0; return this.endGrab('MP 耗盡'); }
     const o = p.shoulder();
+    const lv = GRAB_LEVELS[cfg.grabLevel] ?? GRAB_LEVELS[1];
+    // 被牆卡住、角色走遠了就放開
+    if (distToRect(o.x, o.y, t) > lv.range + 24) return this.endGrab('離太遠，放開了');
     let tx = this.mouse.x;
     let ty = this.mouse.y;
-    const d = Math.hypot(tx - o.x, ty - o.y);
-    if (d > cfg.grabRange) { tx = o.x + ((tx - o.x) / d) * cfg.grabRange; ty = o.y + ((ty - o.y) / d) * cfg.grabRange; }
+    const d = Math.hypot(tx - o.x, ty - o.y) || 1;
+    // Lv1：拿在角色面前（游標只決定方向）；Lv2 以上：跟著游標，限制在抓取距離內
+    const reach = lv.carry ? 10 + Math.max(t.w, t.h) / 2 : Math.min(d, lv.range);
+    tx = o.x + ((tx - o.x) / d) * reach;
+    ty = o.y + ((ty - o.y) / d) * reach;
     let vx = (tx - t.cx) * 10;
     let vy = (ty - t.cy) * 10;
     const v = Math.hypot(vx, vy);
