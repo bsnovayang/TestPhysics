@@ -55,6 +55,18 @@ export class IronBlock extends Box {
     this.mass = 2;
     this.density = 3;
   }
+
+  // 撞牆、地面或其他物體太用力就碎掉
+  onImpact(world, speed) {
+    if (speed > cfg.ironBreak) this.shatter(world);
+  }
+
+  shatter(world) {
+    if (!this.alive) return;
+    this.alive = false;
+    world.burst(this.cx, this.cy, '#8f98ab', 16);
+    world.burst(this.cx, this.cy, '#3a3f4c', 10);
+  }
 }
 
 // 左右移動的平台（實心），會載著站在上面的物體一起移動。碰到牆或 '|' 標記時折返。

@@ -89,6 +89,8 @@ export class Renderer {
     this.drawProjectiles(world);
     this.drawParticles(world);
     this.drawFieldOutlines(world);
+    this.drawStasisArrows(world);
+    this.drawDirAim(world);
     this.drawPreview(world);
     if (cfg.showHitboxes) this.drawHitboxes(world);
     this.drawHud(world);
@@ -1081,6 +1083,43 @@ export class Renderer {
     ctx.stroke();
   }
 
+  // 時停中累積的力：從物體中心畫出箭頭，力道越大越長、越粗、越亮（時間系的藍色；紅色保留給「加熱」）
+  drawStasisArrows(world) {
+    const ctx = this.ctx;
+    for (const e of world.entities) {
+      if (!e.isBody || !e.alive || e.mods.time >= 0.05) continue;
+      const v = Math.hypot(e.vx, e.vy);
+      if (v < 20) continue;
+      const k = Math.min(1, v / 900);
+      const len = Math.round(10 + k * 30);
+      const ux = e.vx / v;
+      const uy = e.vy / v;
+      const c = Math.round(120 + k * 135);
+      ctx.strokeStyle = `rgb(${Math.round(74 + k * 181)},${Math.round(168 + k * 87)},255)`;
+      ctx.lineWidth = k > 0.6 ? 3 : 2;
+      this.drawArrow(e.cx + (ux * len) / 2, e.cy + (uy * len) / 2, ux, uy, len);
+      ctx.lineWidth = 1;
+      if (c > 250 && Math.floor(world.time * 8) % 2) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(Math.round(e.cx + ux * len) - 1, Math.round(e.cy + uy * len) - 1, 3, 3);
+      }
+    }
+  }
+
+  // 定向重力施放中：從起點到游標的方向箭頭
+  drawDirAim(world) {
+    const anchor = world.dirAimAnchor?.();
+    if (!anchor) return;
+    const ctx = this.ctx;
+    const dir = world.dirAim.web.dir;
+    ctx.strokeStyle = '#d0b0ff';
+    ctx.lineWidth = 2;
+    this.drawArrow(anchor.x + dir.x * 20, anchor.y + dir.y * 20, dir.x, dir.y, 28);
+    ctx.lineWidth = 1;
+    ctx.fillStyle = '#d0b0ff';
+    ctx.fillRect(Math.round(anchor.x) - 1, Math.round(anchor.y) - 1, 3, 3);
+  }
+
   drawPreview(world) {
     const ctx = this.ctx;
     const pv = world.previewWeb();
@@ -1208,6 +1247,9 @@ export class Renderer {
     if (world.fields.channeling) {
       text = '維持中：放開按鍵結束';
       color = '#ffd34d';
+    } else if (world.dirAim) {
+      text = '移動游標決定方向，放開確定';
+      color = '#d0b0ff';
     } else if (world.isSelfCast()) {
       if (cfg.selfAttachUnlocked) {
         text = '長按：附著自己（持續耗 MP）';

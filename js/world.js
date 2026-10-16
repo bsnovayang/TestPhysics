@@ -132,6 +132,7 @@ export class World {
     this.spawn = parsed.spawn;
     this.projectiles = [];
     this.fields.clear();
+    this.dirAim = null;
     this.fields.base = { x: 0, y: 1 }; // 重力魔王轉過的重力，換房間或重來時恢復向下
     this.hasBoss = this.entities.some((e) => e.isBoss);
     this.portals.clear();
@@ -300,7 +301,34 @@ export class World {
       this.burst(p.cx, p.cy, '#ffffff', 10);
       return;
     }
-    this.projectiles.push(new Web(o.x, o.y, end.x, end.y, id, dir));
+    const web = new Web(o.x, o.y, end.x, end.y, id, dir);
+    this.projectiles.push(web);
+    // 定向重力（LOL 式施放）：網飛到游標的位置當起點；按住技能鍵時拖曳游標決定方向，放開時確定
+    if (skill.type === 'gravityDir') this.dirAim = { key: keyCode, web };
+  }
+
+  // 定向重力的方向：從起點（網的落點或展開的場域）指向游標。場域展開後也會即時改變，放開按鍵才固定
+  dirAimAnchor() {
+    const a = this.dirAim;
+    if (!a) return null;
+    if (a.web.field) return this.fields.list.includes(a.web.field) ? a.web.field : null;
+    return a.web.alive ? { x: a.web.tx, y: a.web.ty } : null;
+  }
+
+  updateDirAim() {
+    const a = this.dirAim;
+    if (!a) return;
+    const anchor = this.dirAimAnchor();
+    if (!anchor) { this.dirAim = null; return; }
+    const dx = this.mouse.x - anchor.x;
+    const dy = this.mouse.y - anchor.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 8) {
+      const dir = { x: dx / d, y: dy / d };
+      a.web.dir = dir;
+      if (a.web.field) a.web.field.dir = dir;
+    }
+    if (!this.input.isDown(a.key)) this.dirAim = null;
   }
 
   // 閃現：朝游標瞬間移動，保留原本的速度。不能穿牆時，停在路徑上最後一個空位
@@ -461,6 +489,7 @@ export class World {
     this.portals.update(dt, this);
     this.player.update(this, dt);
     this.updateChannels(dt);
+    this.updateDirAim();
 
     if (this.pendingRoom === null) {
       for (const e of this.entities) if (e.alive) e.update(this, dt);
@@ -509,6 +538,8 @@ export class World {
 
         if (b.isEnemy) b.takeImpact(this, impactDamage(rel, a.mass));
         if (a.isEnemy) a.takeImpact(this, impactDamage(rel, b.mass));
+        // 鐵塊撞到敵人造成傷害後就碎掉（彈藥用一次）
+        for (const e of [a, b]) if (e.isIron) e.shatter(this);
         for (const e of [a, b]) if (e.isEnemy) { e.impactCd = 0.3; e.stunT = 0.3; }
 
         // 沿相對速度方向交換動量

@@ -107,7 +107,8 @@ export class Web {
   expand(world, target = null) {
     const x = target ? target.cx : this.x;
     const y = target ? target.cy : this.y;
-    world.fields.add(new Field(x, y, this.skillId, this.dir, target));
+    this.field = new Field(x, y, this.skillId, this.dir, target);
+    world.fields.add(this.field);
     world.burst(x, y, '#ffffff', 10);
     this.alive = false;
   }
@@ -126,7 +127,9 @@ export class AirShot {
 
   update(world, dt) {
     const m = world.fields.sample(this.x, this.y);
-    const dist = cfg.cannonSpeed * dt * m.time;
+    // 和玩家一樣，在時停中最低保有 0.2 倍速度：才打得到被時停的物體，讓力量累積在物體上（曠野之息式的時停）
+    const tm = Math.max(m.time, cfg.playerMinTime);
+    const dist = cfg.cannonSpeed * dt * tm;
     const steps = Math.max(1, Math.ceil(dist / 4));
     for (let i = 0; i < steps; i++) {
       if (this.startedInside === undefined) this.startedInside = !!world.fields.shieldPush(this.x, this.y);

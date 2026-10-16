@@ -109,6 +109,7 @@ export const cfg = {
   impactThreshold: 320,  // px/s，約等於從 3.6 格高掉下來；要高於跳躍兵的起跳速度（270），否則它落地會自傷
   impactPerDamage: 50,   // 超過門檻每多少 px/s 算 1 點傷害
   impactRestitution: 0.3,
+  ironBreak: 400,        // 鐵塊撞牆或地面的速度超過這個值就碎掉（撞到敵人造成傷害時一定碎）
 
   // 物件
   boxFriction: 900,
