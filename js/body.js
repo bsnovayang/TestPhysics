@@ -10,6 +10,13 @@ export function impactDamage(speed, mass = 1) {
   return Math.max(1, Math.round(((speed - cfg.impactThreshold) / cfg.impactPerDamage) * mass));
 }
 
+// 點到矩形最近的距離
+export function distToRect(x, y, r) {
+  const dx = Math.max(r.x - x, 0, x - (r.x + r.w));
+  const dy = Math.max(r.y - y, 0, y - (r.y + r.h));
+  return Math.hypot(dx, dy);
+}
+
 export function approach(value, target, delta) {
   if (value < target) return Math.min(value + delta, target);
   return Math.max(value - delta, target);

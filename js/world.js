@@ -1,11 +1,4 @@
-import { cfg, COLS, ROWS, STEP, GRAB_LEVELS } from './config.js';
-
-// 點到矩形最近的距離
-function distToRect(x, y, r) {
-  const dx = Math.max(r.x - x, 0, x - (r.x + r.w));
-  const dy = Math.max(r.y - y, 0, y - (r.y + r.h));
-  return Math.hypot(dx, dy);
-}
+import { cfg, COLS, ROWS } from './config.js';
 import { TileMap } from './tilemap.js';
 import { Field, FieldSystem } from './fields.js';
 import { SKILLS, DEFAULT_LOADOUT, isFieldSkill } from './skills.js';
@@ -13,19 +6,16 @@ import { PortalSystem } from './portals.js';
 import { rectsOverlap, impactDamage } from './body.js';
 import { Player } from './player.js';
 import { Web } from './projectiles.js';
-import { Presser, Balloon, CeilingWalker, ShieldSoldier, GravityBoss } from './gravity-enemies.js';
-import { IronBlock, Box, BoxSpawner, MovingPlatform, Blade, Crusher, Switch, FixedJammer, MovableJammer, IceBlock, Cooler, Heater, SteamPlatform } from './objects.js';
 import { WaterSystem } from './water.js';
-import { Walker, Heavy, Jumper, Flyer, Turret, LaserEnemy } from './enemies.js';
-import { Emitter, MirrorBox } from './light.js';
-import { Vent, LiquidSource } from './volcano.js';
-
-// 干擾裝置的地圖字元：1～4 固定、5～8 可移動，依序為 重力、時間、空間、全部
-const JAMMER_KINDS = ['gravity', 'time', 'space', 'all'];
 import { ROOMS } from './rooms.js';
+import { LEGEND } from './legend.js';
+import { DirAimAbility } from './abilities/dir-aim.js';
+import { GrabAbility } from './abilities/grab.js';
+import { ReflectAbility } from './abilities/reflect.js';
+import { RailgunAbility } from './abilities/railgun.js';
+import { RewindAbility } from './abilities/rewind.js';
+import { BlinkAbility } from './abilities/blink.js';
 import { makeRng } from './rng.js';
-
-const KEEP_IN_MAP = new Set(['#', '^', 'D', '|', 'I', 'Z']);
 
 function parseRoom(def) {
   const rows = def.map.map((r) => r.padEnd(COLS, ' ').slice(0, COLS));
@@ -39,63 +29,25 @@ function parseRoom(def) {
   for (let ty = 0; ty < ROWS; ty++) {
     for (let tx = 0; tx < COLS; tx++) {
       const c = grid[ty][tx];
-      if (KEEP_IN_MAP.has(c) || c === ' ') continue;
-      switch (c) {
-        case 'P': spawn = { tx, ty }; break;
-        case 'B': entities.push(new Box(tx, ty)); break;
-        case 'K': entities.push(new Box(tx, ty, true)); break;
-        case '@': entities.push(new BoxSpawner(tx, ty)); break;
-        case 'N': entities.push(new BoxSpawner(tx, ty, 'iron')); break;
-        case '!': entities.push(new Vent(tx, ty)); break;
-        case '&': entities.push(new LiquidSource(tx, ty, 'lava', true)); break;
-        case '$': entities.push(new LiquidSource(tx, ty, 'water', false)); break;
-        case 'M': entities.push(new MirrorBox(tx, ty)); break;
-        case '~': water.push({ tx, ty }); break;
-        case '%': grid[ty][tx] = '^'; water.push({ tx, ty }); continue; // 泡在水裡的尖刺
-        case 'Y': entities.push(new IceBlock(tx, ty)); break;
-        case 'C': entities.push(new Cooler(tx, ty)); break;
-        case 'H': // 點燃的火爐
-        case 'G': // 熄滅的火爐
-          entities.push(new Heater(tx, ty, c === 'H'));
-          grid[ty][tx] = '#'; // 火爐嵌在牆裡，水不會從它的位置漏出去
-          continue;
-        case 'W': switches.push(new Switch(tx, ty, 'steam')); break;
-        case 'X': entities.push(new Emitter(tx, ty)); break;
-        case 'R': switches.push(new Switch(tx, ty, 'light')); break;
-        case 'l': entities.push(new LaserEnemy(tx, ty)); break;
-        case '1': case '2': case '3': case '4':
-          entities.push(new FixedJammer(tx, ty, JAMMER_KINDS[Number(c) - 1]));
-          break;
-        case '5': case '6': case '7': case '8':
-          entities.push(new MovableJammer(tx, ty, JAMMER_KINDS[Number(c) - 5]));
-          break;
-        case 'L': switches.push(new Switch(tx, ty, 'lock')); break;
-        case 'S': switches.push(new Switch(tx, ty, 'plate')); break;
-        case 'O': entities.push(new Blade(tx, ty)); break;
-        case 'w': entities.push(new Walker(tx, ty)); break;
-        case 'h': entities.push(new Heavy(tx, ty)); break;
-        case 'j': entities.push(new Jumper(tx, ty)); break;
-        case 'f': entities.push(new Flyer(tx, ty)); break;
-        case 'T': entities.push(new Turret(tx, ty)); break;
-        case 'p': entities.push(new Presser(tx, ty)); break;
-        case 'b': entities.push(new Balloon(tx, ty)); break;
-        case 'u': entities.push(new CeilingWalker(tx, ty)); break;
-        case 'g': entities.push(new ShieldSoldier(tx, ty)); break;
-        case 'm': entities.push(new GravityBoss(tx, ty)); break;
-        case 'n': entities.push(new IronBlock(tx, ty)); break;
-        case 'V':
-        case 'U':
-        case '=': {
-          // 連續的同一個字元合成一個物件
-          let n = 0;
-          while (grid[ty][tx + n] === c) { grid[ty][tx + n] = ' '; n++; }
-          entities.push(c === 'V' ? new Crusher(tx, ty, n) : c === 'U' ? new SteamPlatform(tx, ty, n) : new MovingPlatform(tx, ty, n));
-          continue;
-        }
-        default:
-          console.warn(`未知的地圖字元 "${c}"（${tx}, ${ty}）`);
+      const item = LEGEND[c];
+      if (!item) {
+        console.warn(`未知的地圖字元 "${c}"（${tx}, ${ty}）`);
+        grid[ty][tx] = ' ';
+        continue;
       }
-      grid[ty][tx] = ' ';
+      if (item.tile || c === ' ') continue;
+      if (item.spawn) spawn = { tx, ty };
+      if (item.water) water.push({ tx, ty });
+      if (item.entity) entities.push(item.entity(tx, ty));
+      if (item.switch) switches.push(item.switch(tx, ty));
+      if (item.run) {
+        // 連續的同一個字元合成一個物件
+        let n = 0;
+        while (grid[ty][tx + n] === c) { grid[ty][tx + n] = ' '; n++; }
+        entities.push(item.run(tx, ty, n));
+        continue;
+      }
+      grid[ty][tx] = item.replaceWith ?? ' ';
     }
   }
   return { rows: grid.map((r) => r.join('')), entities, switches, spawn, water };
@@ -342,283 +294,6 @@ export class World {
     this.projectiles.push(web);
     // 定向重力（LOL 式施放）：網飛到游標的位置當起點；按住技能鍵時拖曳游標決定方向，放開時確定
     if (skill.type === 'gravityDir') this.dirAim = { key: keyCode, web };
-  }
-
-  // 定向重力的方向：從起點（網的落點或展開的場域）指向游標。場域展開後也會即時改變，放開按鍵才固定
-  dirAimAnchor() {
-    const a = this.dirAim;
-    if (!a) return null;
-    if (a.web.field) return this.fields.list.includes(a.web.field) ? a.web.field : null;
-    return a.web.alive ? { x: a.web.tx, y: a.web.ty } : null;
-  }
-
-  updateDirAim() {
-    const a = this.dirAim;
-    if (!a) return;
-    const anchor = this.dirAimAnchor();
-    if (!anchor) { this.dirAim = null; return; }
-    const dx = this.mouse.x - anchor.x;
-    const dy = this.mouse.y - anchor.y;
-    const d = Math.hypot(dx, dy);
-    if (d > 8) {
-      const dir = { x: dx / d, y: dy / d };
-      a.web.dir = dir;
-      if (a.web.field) a.web.field.dir = dir;
-    }
-    if (!this.input.isDown(a.key)) this.dirAim = null;
-  }
-
-  // 重力抓取：抓住游標下的物體（箱子、鐵塊、輕的敵人）。回傳是否成功
-  startGrab(keyCode) {
-    const p = this.player;
-    const o = p.shoulder();
-    const t = this.entities.find((e) => e.isBody && e.alive && !e.isBoss
-      && this.mouse.x > e.x - 4 && this.mouse.x < e.x + e.w + 4 && this.mouse.y > e.y - 4 && this.mouse.y < e.y + e.h + 4);
-    if (!t) { this.toast('游標下沒有可以抓的東西'); return false; }
-    const lv = GRAB_LEVELS[cfg.grabLevel] ?? GRAB_LEVELS[1];
-    if (distToRect(o.x, o.y, t) > lv.range) { this.toast(lv.carry ? '要靠近一點才抓得到' : '太遠了'); return false; }
-    if (t.mass > lv.maxMass) { this.toast('太重了，抓不起來'); return false; }
-    if (t === p.groundBody) { this.toast('不能抓自己腳下的東西'); return false; }
-    if (this.fields.jammedAt(t.cx, t.cy, 'gravity')) { this.toast('重力被干擾，抓不起來'); return false; }
-    // 中間不能被牆擋住
-    const d = Math.hypot(t.cx - o.x, t.cy - o.y);
-    for (let k = 8; k < d; k += 4) {
-      const x = o.x + ((t.cx - o.x) / d) * k;
-      const y = o.y + ((t.cy - o.y) / d) * k;
-      // 碰到目標外圍 4 px 就算看得到（放在平台上的箱子，視線常會擦過平台邊角）
-      if (x > t.x - 4 && x < t.x + t.w + 4 && y > t.y - 4 && y < t.y + t.h + 4) break;
-      if (this.map.pointSolid(x, y)) { this.toast('被牆擋住了'); return false; }
-    }
-    this.grab = { target: t, key: keyCode };
-    t.held = true;
-    this.burst(t.cx, t.cy, '#c9a8ff', 10);
-    return true;
-  }
-
-  endGrab(message) {
-    if (!this.grab) return;
-    this.grab.target.held = false;
-    this.grab = null;
-    if (message) this.toast(message);
-  }
-
-  // 被抓住的物體追向游標（限制在抓取距離內），速度有上限；放開按鍵時保留當下的速度，所以可以丟出去
-  updateGrab(dt) {
-    const g = this.grab;
-    if (!g) return;
-    const p = this.player;
-    const t = g.target;
-    if (!t.alive) return this.endGrab();
-    if (!this.input.isDown(g.key)) return this.endGrab();
-    if (t === p.groundBody) return this.endGrab('不能抓自己腳下的東西');
-    if (this.fields.jammedAt(t.cx, t.cy, 'gravity')) return this.endGrab('重力被干擾，放開了');
-    p.mp -= cfg.grabDrain * dt;
-    if (p.mp <= 0) { p.mp = 0; return this.endGrab('MP 耗盡'); }
-    const o = p.shoulder();
-    const lv = GRAB_LEVELS[cfg.grabLevel] ?? GRAB_LEVELS[1];
-    // 被牆卡住、角色走遠了就放開
-    if (distToRect(o.x, o.y, t) > lv.range + 24) return this.endGrab('離太遠，放開了');
-    let tx = this.mouse.x;
-    let ty = this.mouse.y;
-    const d = Math.hypot(tx - o.x, ty - o.y) || 1;
-    // Lv1：拿在角色面前（游標只決定方向）；Lv2 以上：跟著游標，限制在抓取距離內
-    const reach = lv.carry ? 10 + Math.max(t.w, t.h) / 2 : Math.min(d, lv.range);
-    tx = o.x + ((tx - o.x) / d) * reach;
-    ty = o.y + ((ty - o.y) / d) * reach;
-    let vx = (tx - t.cx) * 10;
-    let vy = (ty - t.cy) * 10;
-    const v = Math.hypot(vx, vy);
-    if (v > cfg.grabSpeed) { vx *= cfg.grabSpeed / v; vy *= cfg.grabSpeed / v; }
-    t.vx = vx;
-    t.vy = vy;
-    if (t.isEnemy) t.stunT = Math.max(t.stunT, 0.2); // 被抓住的敵人不能行動
-  }
-
-  // 向量反射：維持中持續耗 MP；身邊的子彈原路彈回去（變成我方子彈）、衝過來的物體照物理反彈，每次反射額外耗 MP。
-  // 雷射在 traceBeam 裡反射（world.reflectLaser 表示這一幀有反射雷射）。放開按鍵或 MP 用光時結束，進入冷卻
-  updateReflect(dt) {
-    const rf = this.reflect;
-    if (!rf) return;
-    const p = this.player;
-    rf.flash = Math.max(0, rf.flash - dt);
-    if (!this.input.isDown(rf.key)) return this.endReflect(false);
-    let spend = cfg.reflectDrain * dt;
-    if (this.reflectLaser) spend += cfg.reflectLaserCost * dt;
-    const R = cfg.reflectRadius;
-    for (const e of this.entities) {
-      if (!e.alive) continue;
-      if (e.isBullet && !e.friendly) {
-        const nx = e.cx - p.cx;
-        const ny = e.cy - p.cy;
-        const d = Math.hypot(nx, ny);
-        if (d > R) continue;
-        // 子彈原路彈回（回到發射者），不是照圓的法線反射，否則角色一移動就會斜斜地彈開
-        e.vx = -e.vx;
-        e.vy = -e.vy;
-        e.friendly = true;
-        spend += cfg.reflectBulletCost;
-        rf.flash = 0.15;
-        this.burst(e.cx, e.cy, '#ffb347', 5);
-        continue;
-      }
-      if (!e.isBody || e.held || e.isBoss || e.reflectCd > 0) continue;
-      // 矩形上離角色中心最近的點
-      const qx = Math.max(e.x, Math.min(p.cx, e.x + e.w));
-      const qy = Math.max(e.y, Math.min(p.cy, e.y + e.h));
-      const d = Math.hypot(qx - p.cx, qy - p.cy);
-      if (d > R) continue;
-      const ux = (e.cx - p.cx) / (Math.hypot(e.cx - p.cx, e.cy - p.cy) || 1);
-      const uy = (e.cy - p.cy) / (Math.hypot(e.cx - p.cx, e.cy - p.cy) || 1);
-      const rel = (e.vx - p.vx) * ux + (e.vy - p.vy) * uy;
-      if (rel < -40) {
-        // 衝過來的物體：相對速度反向，越重越快消耗越多
-        e.vx -= 2 * rel * ux;
-        e.vy -= 2 * rel * uy;
-        spend += Math.min(20, Math.max(2, (e.mass * -rel) / 40));
-      } else if (e.isEnemy) {
-        // 貼著的敵人：推開
-        e.vx += ux * 160;
-        e.vy += uy * 160;
-        spend += 2;
-      } else continue;
-      e.reflectCd = 0.25;
-      e.stunT = Math.max(e.stunT ?? 0, 0.3);
-      rf.flash = 0.15;
-      this.burst(qx, qy, '#ffb347', 6);
-    }
-    for (const e of this.entities) if (e.reflectCd > 0) e.reflectCd -= dt;
-    p.mp -= spend;
-    if (p.mp <= 0) { p.mp = 0; this.endReflect(true); }
-  }
-
-  endReflect(empty) {
-    if (!this.reflect) return;
-    this.reflect = null;
-    this.cooldowns.reflect = empty ? cfg.reflectCdEmpty : cfg.reflectCd;
-    if (empty) this.toast('MP 耗盡，反射中斷');
-  }
-
-  // 電磁加速：把身邊（railRange 內）離游標最近的金屬物體朝游標方向射出。回傳是否成功
-  fireRail() {
-    const p = this.player;
-    const o = p.shoulder();
-    const cands = this.entities.filter((e) => e.isBody && e.alive && e.isMetal && e.mass <= cfg.railMaxMass && distToRect(o.x, o.y, e) <= cfg.railRange);
-    if (!cands.length) {
-      const heavy = this.entities.some((e) => e.isBody && e.alive && e.isMetal && distToRect(o.x, o.y, e) <= cfg.railRange);
-      this.toast(heavy ? '太重了，射不出去' : '身邊沒有金屬');
-      return false;
-    }
-    const m = this.mouse;
-    const t = cands.reduce((a, b) => (Math.hypot(a.cx - m.x, a.cy - m.y) <= Math.hypot(b.cx - m.x, b.cy - m.y) ? a : b));
-    let dx = m.x - t.cx;
-    let dy = m.y - t.cy;
-    const d = Math.hypot(dx, dy);
-    if (d < 4) { dx = p.facing; dy = 0; } else { dx /= d; dy /= d; }
-    if (this.grab?.target === t) this.endGrab();
-    t.rewind = null;
-    t.vx = dx * cfg.railSpeed;
-    t.vy = dy * cfg.railSpeed;
-    t.railT = cfg.railTime;
-    t.railLast = { x: t.cx, y: t.cy };
-    // 發射的閃光：從角色到物體一道閃電
-    this.bolts.push({ x1: o.x, y1: o.y, x2: t.cx, y2: t.cy, life: 0.2 });
-    this.burst(t.cx, t.cy, '#bfefff', 14);
-    return true;
-  }
-
-  // 電磁加速飛行中的物體：沿路留下閃電
-  updateRails(dt) {
-    for (const e of this.entities) {
-      if (!(e.railT > 0)) continue;
-      e.railT -= dt;
-      if (e.alive && e.railLast) {
-        this.bolts.push({ x1: e.railLast.x, y1: e.railLast.y, x2: e.cx, y2: e.cy, life: 0.3 });
-        e.railLast = { x: e.cx, y: e.cy };
-      }
-    }
-    for (const b of this.bolts) b.life -= dt;
-    this.bolts = this.bolts.filter((b) => b.life > 0);
-    for (const id in this.cooldowns) this.cooldowns[id] = Math.max(0, this.cooldowns[id] - dt);
-  }
-
-  // 時間倒轉：物體沿著過去的路徑倒退回去。由網打中物體時呼叫
-  startRewind(target) {
-    if (this.fields.jammedAt(target.cx, target.cy, 'time')) { this.toast('時間被干擾，無法倒轉'); this.refundSkill(); return; }
-    const h = target.hist ?? [];
-    const moved = h.some((q) => Math.abs(q.x - target.x) > 4 || Math.abs(q.y - target.y) > 4);
-    if (!moved) { this.toast('它最近沒有移動過'); this.refundSkill(); return; }
-    if (this.grab?.target === target) this.endGrab();
-    target.rewind = { frames: target.hist.slice().reverse(), i: 0 };
-    target.hist = [];
-    target.vx = 0;
-    target.vy = 0;
-    this.burst(target.cx, target.cy, '#9fd8ff', 14);
-  }
-
-  // 每幀記錄物體的位置（最多 rewindTime 秒），倒轉時拿來播放
-  recordHistory() {
-    const max = Math.round(cfg.rewindTime / STEP);
-    for (const e of this.entities) {
-      if (!e.isBody || !e.alive || e.rewind || e.isBoss) continue;
-      (e.hist ??= []).push({ x: e.x, y: e.y });
-      if (e.hist.length > max) e.hist.shift();
-    }
-  }
-
-  // 倒轉中的物體：照著記錄倒著走（實心，站在上面的東西會被載著走）
-  stepRewinds() {
-    for (const e of this.entities) {
-      const r = e.rewind;
-      if (!r || !e.alive) continue;
-      r.i = Math.min(r.frames.length - 1, r.i + cfg.rewindSpeed);
-      const to = r.frames[Math.floor(r.i)];
-      const dx = to.x - e.x;
-      const dy = to.y - e.y;
-      const riders = this.bodies().filter((b) => b !== e && !b.rewind && Math.abs(b.y + b.h - e.y) < 1.5 && b.x < e.x + e.w && b.x + b.w > e.x);
-      // 往上時先移動站在上面的東西，往下時先移動自己，避免互相卡住
-      if (dy < 0) for (const b of riders) b.moveAxis(this, 'y', dy);
-      e.x = to.x;
-      e.y = to.y;
-      if (dy >= 0) for (const b of riders) b.moveAxis(this, 'y', dy);
-      for (const b of riders) b.moveAxis(this, 'x', dx);
-      e.vx = 0;
-      e.vy = 0;
-      if (r.i >= r.frames.length - 1) e.rewind = null;
-    }
-  }
-
-  // 閃現：朝游標瞬間移動，保留原本的速度。不能穿牆時，停在路徑上最後一個空位
-  blink() {
-    const p = this.player;
-    const from = { x: p.cx, y: p.cy };
-    const dx = this.mouse.x - from.x;
-    const dy = this.mouse.y - from.y;
-    const d = Math.min(Math.hypot(dx, dy), cfg.blinkRange);
-    if (d < 1) return;
-    const tx = from.x + (dx / Math.hypot(dx, dy)) * d;
-    const ty = from.y + (dy / Math.hypot(dx, dy)) * d;
-    if (this.fields.jammedAt(from.x, from.y, 'space') || this.fields.jammedAt(tx, ty, 'space')) {
-      this.toast('空間被干擾，無法閃現');
-      this.refundSkill();
-      return;
-    }
-    const ux = dx / Math.hypot(dx, dy);
-    const uy = dy / Math.hypot(dx, dy);
-    const free = (t) => !this.rectBlocked(from.x + ux * t - p.w / 2, from.y + uy * t - p.h / 2, p.w, p.h, p);
-
-    let best = 0;
-    if (cfg.blinkThroughWalls) {
-      for (let t = d; t > 0; t -= 2) if (free(t)) { best = t; break; }
-    } else {
-      for (let t = 2; t <= d; t += 2) {
-        if (!free(t)) break;
-        best = t;
-      }
-    }
-    this.burst(p.cx, p.cy, '#3ddc84', 10);
-    p.x = from.x + ux * best - p.w / 2;
-    p.y = from.y + uy * best - p.h / 2;
-    this.burst(p.cx, p.cy, '#3ddc84', 10);
   }
 
   // 技能失敗時退回 MP
@@ -868,3 +543,6 @@ export class World {
     this.toast(open ? '門打開了' : '門關上了');
   }
 }
+
+// 各種能力的邏輯放在 js/abilities/，掛到 World 上
+Object.assign(World.prototype, DirAimAbility, GrabAbility, ReflectAbility, RailgunAbility, RewindAbility, BlinkAbility);
