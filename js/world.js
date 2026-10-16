@@ -13,6 +13,7 @@ import { DirAimAbility } from './abilities/dir-aim.js';
 import { GrabAbility } from './abilities/grab.js';
 import { ReflectFieldAbility } from './abilities/reflect-field.js';
 import { ThermalAbility } from './abilities/thermal.js';
+import { WindAbility } from './abilities/wind.js';
 import { RailgunAbility } from './abilities/railgun.js';
 import { RewindAbility } from './abilities/rewind.js';
 import { BlinkAbility } from './abilities/blink.js';
@@ -303,7 +304,7 @@ export class World {
     const web = new Web(o.x, o.y, end.x, end.y, id, dir);
     this.projectiles.push(web);
     // 定向重力（LOL 式施放）：網飛到游標的位置當起點；按住技能鍵時拖曳游標決定方向，放開時確定
-    if (skill.type === 'gravityDir') this.dirAim = { key: keyCode, web };
+    if (skill.type === 'gravityDir' || skill.type === 'wind') this.dirAim = { key: keyCode, web };
   }
 
   // 技能失敗時退回 MP
@@ -456,6 +457,7 @@ export class World {
 
     if (this.pendingRoom === null) {
       this.updateGrab(dt);
+      this.updateWind(dt);
       this.stepRewinds();
       for (const e of this.entities) if (e.alive && !e.rewind) e.update(this, dt);
       for (const p of this.projectiles) if (p.alive) p.update(this, dt);
@@ -553,4 +555,4 @@ export class World {
 }
 
 // 各種能力的邏輯放在 js/abilities/，掛到 World 上
-Object.assign(World.prototype, DirAimAbility, GrabAbility, ReflectFieldAbility, ThermalAbility, RailgunAbility, RewindAbility, BlinkAbility, CharmAbility, PossessAbility);
+Object.assign(World.prototype, DirAimAbility, GrabAbility, ReflectFieldAbility, ThermalAbility, WindAbility, RailgunAbility, RewindAbility, BlinkAbility, CharmAbility, PossessAbility);

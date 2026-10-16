@@ -186,6 +186,7 @@ export class PixelWaterSystem extends WaterSystem {
     this.buildMask(world);
     this.displace();
     this.simulate(world, dt);
+    this.windPixels(world);
     this.reactPixels();
     this.derive();
     // 溫度沿用原版（火爐、熔岩加熱水與冰；冷凍裝置讓熔岩凝固）；結冰改成逐像素
@@ -194,6 +195,37 @@ export class PixelWaterSystem extends WaterSystem {
     this.syncSolids(world);
     this.meltRemnants(world, dt);
     this.derive();
+  }
+
+  // 風場：範圍內的蒸氣像素有一定機率往風向移動一格（從下風處開始處理，避免同一個像素一幀被推好幾格）
+  windPixels(world) {
+    for (const wf of world.windFields?.() ?? []) {
+      const sx = Math.abs(wf.dir.x) > 0.38 ? Math.sign(wf.dir.x) : 0;
+      const sy = Math.abs(wf.dir.y) > 0.38 ? Math.sign(wf.dir.y) : 0;
+      if (!sx && !sy) continue;
+      const x0 = Math.max(0, Math.floor((wf.x - wf.r) / FS));
+      const x1 = Math.min(FW - 1, Math.ceil((wf.x + wf.r) / FS));
+      const y0 = Math.max(0, Math.floor((wf.y - wf.r) / FS));
+      const y1 = Math.min(FH - 1, Math.ceil((wf.y + wf.r) / FS));
+      const xs = sx > 0 ? [x1, x0, -1] : [x0, x1, 1];
+      const ys = sy > 0 ? [y1, y0, -1] : [y0, y1, 1];
+      for (let fy = ys[0]; fy !== ys[1] + ys[2]; fy += ys[2]) {
+        for (let fx = xs[0]; fx !== xs[1] + xs[2]; fx += xs[2]) {
+          const i = this.fi(fx, fy);
+          if (this.mat[i] !== STEAM) continue;
+          if (Math.hypot(fx * FS + FS / 2 - wf.x, fy * FS + FS / 2 - wf.y) > wf.r) continue;
+          if (this.tTime[this.idx(fx >> 3, fy >> 3)] < 0.05) continue; // 時停中的蒸氣不動
+          if (this.rand() > cfg.windSteam) continue;
+          const nx = fx + sx;
+          const ny = fy + sy;
+          if (nx < 0 || nx >= FW || ny < 0 || ny >= FH) continue;
+          const j = this.fi(nx, ny);
+          if (this.mask[j] || this.mat[j] !== EMPTY) continue;
+          this.mat[j] = STEAM;
+          this.mat[i] = EMPTY;
+        }
+      }
+    }
   }
 
   // 每個大格取樣一次場域：重力方向、時間倍率、是否在冷凍裝置附近

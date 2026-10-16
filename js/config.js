@@ -76,6 +76,12 @@ export const cfg = {
   possessCd: 3,          // 回到本體後的冷卻秒數
   possessStun: 1,        // 附身結束後，那隻敵人暈眩的秒數
 
+  // 風場
+  windSpeed: 220,        // 風速：被吹的東西最多被吹到這麼快
+  windAccel: 6,          // 速度往風速靠近的快慢（每秒）；實際效果再乘上 受風面積 ÷ 質量²
+  windGround: 0.5,       // 玩家站在地上時的倍率（踩得住）
+  windSteam: 0.5,        // 蒸氣像素每一幀被吹動一格的機率
+
   // 空間
   blinkRange: 80,            // 約 5 格
   blinkThroughWalls: false,  // 之後解鎖

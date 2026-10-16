@@ -93,6 +93,7 @@ export class Balloon extends Enemy {
     this.armored = true;
     this.contactDamage = 1;
     this.flies = true; // 被附身時 W／S 上下
+    this.windArea = 9; // 氣球受風面積很大，很容易被吹走（風力要大過螺旋槳）
     this.color = '#5fc8a8';
     this.dropT = 1.5;
   }

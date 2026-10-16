@@ -95,6 +95,15 @@ export const FieldRenderer = {
       ctx.lineWidth = 1;
       this.drawArrow(f.x - 5, f.y, -1, 0, 6);
       this.drawArrow(f.x + 5, f.y, 1, 0, 6);
+    } else if (s.type === 'wind') {
+      // 風場：三條沿著風向流動的短線
+      const t = (Date.now() / 300) % 1;
+      for (let k = -1; k <= 1; k++) {
+        const px = -f.dir.y * k * 8;
+        const py = f.dir.x * k * 8;
+        const off = ((t + k * 0.33 + 1) % 1) * 24 - 12;
+        this.drawArrow(f.x + px + f.dir.x * off, f.y + py + f.dir.y * off, f.dir.x, f.dir.y, 8);
+      }
     } else if (s.type === 'heat') {
       // 加熱：三道往上飄的熱浪
       for (let k = -1; k <= 1; k++) {
