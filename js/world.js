@@ -540,6 +540,9 @@ export class World {
         if (a.isEnemy) a.takeImpact(this, impactDamage(rel, b.mass));
         // 鐵塊撞到敵人造成傷害後就碎掉（彈藥用一次）
         for (const e of [a, b]) if (e.isIron) e.shatter(this);
+        // 魔王丟出的小兵被甩去撞魔王時也碎掉
+        if (a.isBoss && b.isMinion) b.die(this);
+        if (b.isBoss && a.isMinion) a.die(this);
         for (const e of [a, b]) if (e.isEnemy) { e.impactCd = 0.3; e.stunT = 0.3; }
 
         // 沿相對速度方向交換動量

@@ -736,7 +736,7 @@ export class Renderer {
       ctx.stroke();
       this.timeTint(e);
     } else if (e.isBullet) {
-      ctx.fillStyle = e.friendly ? C.shot : C.bullet;
+      ctx.fillStyle = e.friendly ? C.shot : e.gravityBullet ? '#c070ff' : C.bullet;
       ctx.fillRect(e.x, e.y, e.w, e.h);
       if (e.solid) {
         ctx.strokeStyle = '#9fdcff';

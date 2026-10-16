@@ -1,7 +1,7 @@
 import { cfg, TILE } from './config.js';
 import { approach } from './body.js';
 import { Bullet } from './projectiles.js';
-import { Enemy, Walker } from './enemies.js';
+import { Enemy, Walker, Heavy } from './enemies.js';
 import { IronBlock } from './objects.js';
 
 // ---------------------------------------------------------------------------
@@ -176,13 +176,68 @@ export class ShieldSoldier extends Walker {
   }
 }
 
+// 魔王丟出的重裝兵：會追著玩家走（不怕摔、空氣砲打不痛）。
+// 玩家站在旁邊時它會跟過去，不會跑到魔王下方；反過來，把它引到魔王正下方，等重力反轉就會撞上魔王
+export class BossMinion extends Heavy {
+  constructor() {
+    super(0, 0);
+    this.isMinion = true;
+    this.speed = 30;
+  }
+
+  // 不會在平台邊緣掉頭：直接走下去，往玩家的方向掉（否則重力反轉後會被困在平台上）
+  groundAhead() {
+    return true;
+  }
+
+  think(world, ldt) {
+    const p = world.player;
+    const dx = p.cx - this.cx;
+    const sameLevel = Math.abs(p.cy - this.cy) < 24;
+    // 不同層時，水平很近就不再轉向（否則會在玩家正上方的平台邊緣來回走、一直掉不下去）
+    if (this.grounded && Math.abs(dx) > (sameLevel ? 6 : 28)) this.dir = Math.sign(dx);
+    // 和玩家同一層、已經貼近時停下；不同層時繼續往前走，從平台邊緣掉下去
+    if (this.grounded && Math.abs(dx) <= 6 && sameLevel) { this.applyFriction(300 * ldt); return; }
+    super.think(world, ldt);
+  }
+
+  // 被鐵塊或牆擋住時跳過去，而不是掉頭
+  physics(world, ldt) {
+    const want = this.dir;
+    super.physics(world, ldt);
+    if (this.lastMove.bx && this.grounded && this.groundAxis === 'y' && this.stunT <= 0) {
+      this.dir = want;
+      this.vy = -this.groundSign * 300;
+    }
+  }
+}
+
+// 受重力影響的子彈（重力魔王的彈幕）：會跟著房間的重力彎曲，重力反轉時整圈往上甩
+export class GravityBullet extends Bullet {
+  constructor(x, y, vx, vy) {
+    super(x, y, vx, vy);
+    this.gravityBullet = true;
+    this.life = 5;
+  }
+
+  update(world, dt) {
+    const m = world.fields.sample(this.cx, this.cy);
+    const ldt = dt * m.time;
+    this.vx += m.gx * 0.3 * ldt;
+    this.vy += m.gy * 0.3 * ldt;
+    super.update(world, dt);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 重力魔王：魔王自己提供打倒它的手段——它會轉動整個房間的重力、丟出鐵塊；
 // 鐵塊被重力（房間的或玩家的）甩去高速撞它才會受傷。空氣砲在第 1 階段對它無效
 // 第 1 階段：浮在房間中央，每隔一段時間轉動重力：下 → 上 → 下 → 左 → 下 → 右（轉向前有預告）。
 //   每次都先回到向下，所以「把鐵塊推到它正下方，等重力轉上」一定有機會
 export const BOSS_CYCLE = [{ x: 0, y: 1 }, { x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 0 }];
-// 第 2 階段（血量一半以下）：吸到天花板上，重力回到向下，但會定期短暫反轉；這時靠近打它的核心也有效
+// 第 2 階段（血量一半以下）：吸到天花板上，重力回到向下，但會定期短暫反轉；這時靠近打它的核心也有效。
+//   改丟重裝兵（不怕摔，會追著玩家）取代鐵塊；每次重力反轉時射出一圈受重力影響的彈幕。
+//   重裝兵也是彈藥：被甩去高速撞魔王時，魔王扣血、重裝兵碎掉
 // ---------------------------------------------------------------------------
 const BOSS_DIRS = [{ x: 0, y: 1 }, { x: -1, y: 0 }, { x: 0, y: -1 }, { x: 1, y: 0 }];
 export const BOSS = {
@@ -194,6 +249,9 @@ export const BOSS = {
   maxHit: 3,         // 一次撞擊最多扣的血
   blockEvery: 4,     // 每 4 秒丟一個鐵塊
   maxBlocks: 3,
+  minionEvery: 5,    // 第 2 階段：每 5 秒丟一隻重裝兵
+  maxMinions: 2,
+  ringBullets: 10,   // 第 2 階段：每次重力轉向時射出的彈幕數量
   coreRange: 72,     // 第 2 階段：距離這麼近時，空氣砲才打得到核心（站在最上層平台的內側就打得到）
 };
 
@@ -215,6 +273,7 @@ export class GravityBoss extends Enemy {
     this.timer = BOSS.turnEvery;
     this.warnDir = null;   // 預告中的下一個方向（畫面顯示用）
     this.blockT = 2;
+    this.minionT = 1;
     this.fireT = 2.5;
     this.moveT = 0;        // 換階段時移動到天花板的剩餘時間
     this.coreCd = 0;
@@ -269,10 +328,17 @@ export class GravityBoss extends Enemy {
       if (this.timer <= 0) {
         this.setGravity(world, next);
         this.timer = flipped ? BOSS.flipEvery : BOSS.flipTime;
+        this.fireRing(world); // 轉上時打向被甩上天花板的玩家；轉回向下時像雨一樣落下
       }
     }
 
-    // 丟鐵塊：從身體側面往玩家那一側丟出，落點在魔王附近，讓玩家有機會把它推到魔王的下方
+    if (this.phase === 2) this.throwMinion(world, ldt);
+    else this.throwBlock(world, ldt);
+    this.shoot(world, ldt);
+  }
+
+  // 丟鐵塊（第 1 階段）：從身體側面往玩家那一側丟出，落點在魔王附近，讓玩家有機會把它推到魔王的下方
+  throwBlock(world, ldt) {
     this.blockT -= ldt;
     const blocks = world.entities.filter((e) => e.isIron && e.alive).length;
     if (this.blockT <= 0 && blocks < BOSS.maxBlocks) {
@@ -286,8 +352,39 @@ export class GravityBoss extends Enemy {
         world.entities.push(b);
       }
     }
+  }
 
-    // 子彈（可以用空氣砲打回去，但魔王有護甲，打回去也不痛）
+  // 丟重裝兵（第 2 階段）：從魔王正下方往下丟，穿過中間的空隙落到地面，再去追玩家
+  //（往旁邊丟的話會落在平台上，追玩家時卡在平台邊緣下不來）
+  throwMinion(world, ldt) {
+    this.minionT -= ldt;
+    const alive = world.entities.filter((e) => e.isMinion && e.alive).length;
+    // 只在重力向下時丟（反轉中丟的話會直接撞上自己）
+    if (this.minionT > 0 || alive >= BOSS.maxMinions || world.fields.base.y < 0) return;
+    this.minionT = BOSS.minionEvery;
+    const side = Math.sign(world.player.cx - this.cx) || 1;
+    const m = new BossMinion();
+    m.x = Math.round(this.cx - m.w / 2);
+    m.y = Math.round(this.y + this.h + 2);
+    if (world.rectBlocked(m.x, m.y, m.w, m.h, m) || world.overlap(m, world.player)) return;
+    m.vy = world.fields.base.y * 250;
+    m.dir = side;
+    world.entities.push(m);
+    world.burst(m.cx, m.cy, '#c0392b', 10);
+  }
+
+  // 重力彈幕（第 2 階段，每次重力轉向時）：一圈受重力影響的子彈，每次的角度錯開
+  fireRing(world) {
+    const n = BOSS.ringBullets;
+    this.ringAngle = (this.ringAngle ?? 0) + Math.PI / n;
+    for (let i = 0; i < n; i++) {
+      const a = this.ringAngle + (i / n) * Math.PI * 2;
+      world.entities.push(new GravityBullet(this.cx + Math.cos(a) * 20, this.cy + Math.sin(a) * 20, Math.cos(a) * 140, Math.sin(a) * 140));
+    }
+  }
+
+  // 子彈（可以用空氣砲打回去，但魔王有護甲，打回去也不痛）
+  shoot(world, ldt) {
     this.fireT -= ldt;
     if (this.fireT <= 0) {
       this.fireT = this.phase === 1 ? 2.4 : 1.8;
@@ -295,7 +392,12 @@ export class GravityBoss extends Enemy {
       const dx = p.cx - this.cx;
       const dy = p.cy - this.cy;
       const d = Math.hypot(dx, dy) || 1;
-      world.entities.push(new Bullet(this.cx + (dx / d) * 22, this.cy + (dy / d) * 22, (dx / d) * 130, (dy / d) * 130));
+      // 第 2 階段一次 3 發扇形
+      const spread = this.phase === 2 ? [-0.25, 0, 0.25] : [0];
+      for (const da of spread) {
+        const a = Math.atan2(dy, dx) + da;
+        world.entities.push(new Bullet(this.cx + Math.cos(a) * 22, this.cy + Math.sin(a) * 22, Math.cos(a) * 130, Math.sin(a) * 130));
+      }
     }
   }
 
