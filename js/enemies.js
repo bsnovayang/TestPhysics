@@ -179,7 +179,7 @@ export class Enemy extends Body {
   }
 
   takeDamage(world, amount, dir) {
-    if (!this.armored) this.hurt(world, amount);
+    if (!this.armored && amount > 0) this.hurt(world, amount);
     this.vx += (dir.x * cfg.cannonImpulse) / this.mass;
     this.vy += (dir.y * cfg.cannonImpulse) / this.mass;
     this.stunT = 0.3;
@@ -430,7 +430,7 @@ export class Turret extends Enemy {
 
   // 砲台固定不動：會受傷，但不會被擊退
   takeDamage(world, amount) {
-    this.hurt(world, amount);
+    if (amount > 0) this.hurt(world, amount);
   }
 
   think(world, ldt) {

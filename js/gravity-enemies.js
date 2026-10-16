@@ -463,8 +463,10 @@ export class GravityBoss extends Enemy {
   // speed：撞擊的相對速度。魔王很硬：低於 BOSS.minImpact 的撞擊不痛（重力轉向時平台上的鐵塊滑過來撞到它，不會白白受傷）
   takeImpact(world, amount, speed = Infinity) {
     if (amount <= 0 || this.moveT > 0) return;
-    if (speed < BOSS.minImpact) { world.popup(this.cx, this.y, '太慢了', '#9aa7bd'); return; }
-    this.hurt(world, Math.min(BOSS.maxHit, amount));
+    // 破綻中：門檻降回一般的 320、傷害加倍（鼓勵趁機再丟一個東西過去）
+    const staggered = this.staggerT > 0;
+    if (!staggered && speed < BOSS.minImpact) { world.popup(this.cx, this.y, '太慢了', '#9aa7bd'); return; }
+    this.hurt(world, Math.min(BOSS.maxHit * (staggered ? 2 : 1), amount * (staggered ? 2 : 1)));
     if (this.alive) {
       this.staggerT = cfg.bossStagger;
       world.popup(this.cx, this.y - 6, '破綻！', '#ffd34d');
@@ -472,18 +474,8 @@ export class GravityBoss extends Enemy {
     if (this.alive && this.phase === 1 && this.hp <= this.maxHp / 2) this.enterPhase2(world);
   }
 
-  // 空氣砲：平常無效；破綻中（被撞擊打中後）打得到核心（每 0.25 秒最多 1 點）
-  takeDamage(world) {
-    if (this.staggerT > 0 && this.moveT <= 0) {
-      if (this.coreCd <= 0) {
-        this.coreCd = 0.25;
-        this.hurt(world, 1);
-        if (this.alive && this.phase === 1 && this.hp <= this.maxHp / 2) this.enterPhase2(world);
-      }
-      return;
-    }
-    world.popup(this.cx, this.y, '無效', '#9aa7bd');
-  }
+  // 空氣砲、子彈：都打不痛（魔王只怕撞擊）
+  takeDamage() {}
 
   // 除錯：直接扣血（無視護甲與每次上限），血量降到一半時照常進入第二階段
   debugDamage(world, amount) {
