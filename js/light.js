@@ -37,6 +37,7 @@ export function traceBeam(world, x, y, dx, dy, source = null, hitsPlayer = true)
   let lastMirror = null;
   let hit = { type: 'none' };
   let bendSteps = 0;
+  let inReflect = false; // 正在向量反射場裡（避免在圓裡重複反射）
   const heats = []; // 被這道光加熱的水格（只加熱光線經過的第一個水格）
 
   for (let len = 0; len < MAX_LENGTH; len += RAY_STEP) {
@@ -112,6 +113,31 @@ export function traceBeam(world, x, y, dx, dy, source = null, hitsPlayer = true)
       cur.push({ x: nx, y: ny });
       hit = { type: 'receiver', entity: receiver };
       break;
+    }
+    // 向量反射場：光線碰到反射場的邊緣就原路射回去；反射後連發射者自己也打得到
+    const rf = world.reflect;
+    if (rf && source !== world.player) {
+      const p = world.player;
+      const ox = nx - p.cx;
+      const oy = ny - p.cy;
+      const r = Math.hypot(ox, oy);
+      if (r <= cfg.reflectRadius && !inReflect) {
+        const n = { x: ox / (r || 1), y: oy / (r || 1) };
+        const dot = d.x * n.x + d.y * n.y;
+        if (dot < 0) {
+          d = { x: -d.x, y: -d.y };
+          cur.push({ x: nx, y: ny });
+          x = nx;
+          y = ny;
+          inReflect = true;
+          source = null;
+          if (hitsPlayer) world.reflectLaser = true;
+          continue;
+        }
+      }
+      if (r > cfg.reflectRadius) inReflect = false;
+      // 反射後往外走的這一段在圓裡：不會打到玩家
+      if (r <= cfg.reflectRadius) { x = nx; y = ny; continue; }
     }
     if (hitsPlayer && source !== world.player && inRect(world.player, nx, ny)) {
       cur.push({ x: nx, y: ny });

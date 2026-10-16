@@ -184,6 +184,7 @@ export class Bullet {
     this.vx = vx;
     this.vy = vy;
     this.life = 6;
+    this.age = 0;
     this.alive = true;
     this.solid = false;
     this.hittable = true;
@@ -203,7 +204,9 @@ export class Bullet {
     this.x += this.vx * ldt;
     this.y += this.vy * ldt;
     this.life -= ldt;
-    if (this.life <= 0 || world.solidTiles(this.x, this.y, this.w, this.h)) {
+    this.age += ldt;
+    // 剛射出的 0.1 秒不會被地形擋住：站在平台上的砲台往下打時，子彈一生成就會碰到腳下的平台而消失
+    if (this.life <= 0 || (this.age > 0.1 && world.solidTiles(this.x, this.y, this.w, this.h))) {
       this.alive = false;
       return;
     }

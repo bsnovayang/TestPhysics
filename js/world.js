@@ -45,6 +45,7 @@ function parseRoom(def) {
         case 'B': entities.push(new Box(tx, ty)); break;
         case 'K': entities.push(new Box(tx, ty, true)); break;
         case '@': entities.push(new BoxSpawner(tx, ty)); break;
+        case 'N': entities.push(new BoxSpawner(tx, ty, 'iron')); break;
         case '!': entities.push(new Vent(tx, ty)); break;
         case '&': entities.push(new LiquidSource(tx, ty, 'lava', true)); break;
         case '$': entities.push(new LiquidSource(tx, ty, 'water', false)); break;
@@ -114,6 +115,8 @@ export class World {
     this.popups = [];
     this.beams = [];
     this.toasts = [];
+    this.bolts = [];     // 電磁加速的閃電特效：{ x1, y1, x2, y2, life }
+    this.cooldowns = {}; // 技能冷卻：{ 技能 id: 剩餘秒數 }
     this.time = 0;
     this.loadRoom(0);
   }
@@ -141,6 +144,9 @@ export class World {
     this.fields.clear();
     this.dirAim = null;
     this.grab = null;
+    this.reflect = null;
+    this.cooldowns = {};
+    this.bolts = [];
     if (this.room.loadout) this.loadout = [...this.room.loadout]; // 測試房間可以指定裝備
     this.fields.base = { x: 0, y: 1 }; // 重力魔王轉過的重力，換房間或重來時恢復向下
     this.hasBoss = this.entities.some((e) => e.isBoss);
@@ -275,6 +281,10 @@ export class World {
     const skill = SKILLS[id];
     const cost = cfg.mpMax * cfg.mpCostRatio;
     const p = this.player;
+    if (this.cooldowns[id] > 0) {
+      this.toast(`${skill.name}冷卻中（${this.cooldowns[id].toFixed(1)} 秒）`);
+      return;
+    }
     const selfCast = isFieldSkill(skill) && this.isSelfCast();
     if (selfCast && !cfg.selfAttachUnlocked) {
       this.toast('尚未解鎖自身附著');
@@ -282,6 +292,18 @@ export class World {
     }
     if (p.mp < cost) {
       this.toast('MP 不足');
+      return;
+    }
+    if (skill.type === 'reflect') {
+      if (this.reflect) return;
+      p.mp -= cost;
+      this.reflect = { key: keyCode, flash: 0 };
+      this.burst(p.cx, p.cy, '#ffb347', 12);
+      return;
+    }
+    if (skill.type === 'railgun') {
+      if (p.mp < cfg.railCost) { this.toast('MP 不足'); return; }
+      if (this.fireRail()) { p.mp -= cfg.railCost; this.cooldowns.railgun = cfg.railCd; }
       return;
     }
     // 重力抓取：先確認游標下有抓得起來的東西，沒有就不扣 MP
@@ -410,6 +432,113 @@ export class World {
     t.vx = vx;
     t.vy = vy;
     if (t.isEnemy) t.stunT = Math.max(t.stunT, 0.2); // 被抓住的敵人不能行動
+  }
+
+  // 向量反射：維持中持續耗 MP；身邊的子彈原路彈回去（變成我方子彈）、衝過來的物體照物理反彈，每次反射額外耗 MP。
+  // 雷射在 traceBeam 裡反射（world.reflectLaser 表示這一幀有反射雷射）。放開按鍵或 MP 用光時結束，進入冷卻
+  updateReflect(dt) {
+    const rf = this.reflect;
+    if (!rf) return;
+    const p = this.player;
+    rf.flash = Math.max(0, rf.flash - dt);
+    if (!this.input.isDown(rf.key)) return this.endReflect(false);
+    let spend = cfg.reflectDrain * dt;
+    if (this.reflectLaser) spend += cfg.reflectLaserCost * dt;
+    const R = cfg.reflectRadius;
+    for (const e of this.entities) {
+      if (!e.alive) continue;
+      if (e.isBullet && !e.friendly) {
+        const nx = e.cx - p.cx;
+        const ny = e.cy - p.cy;
+        const d = Math.hypot(nx, ny);
+        if (d > R) continue;
+        // 子彈原路彈回（回到發射者），不是照圓的法線反射，否則角色一移動就會斜斜地彈開
+        e.vx = -e.vx;
+        e.vy = -e.vy;
+        e.friendly = true;
+        spend += cfg.reflectBulletCost;
+        rf.flash = 0.15;
+        this.burst(e.cx, e.cy, '#ffb347', 5);
+        continue;
+      }
+      if (!e.isBody || e.held || e.isBoss || e.reflectCd > 0) continue;
+      // 矩形上離角色中心最近的點
+      const qx = Math.max(e.x, Math.min(p.cx, e.x + e.w));
+      const qy = Math.max(e.y, Math.min(p.cy, e.y + e.h));
+      const d = Math.hypot(qx - p.cx, qy - p.cy);
+      if (d > R) continue;
+      const ux = (e.cx - p.cx) / (Math.hypot(e.cx - p.cx, e.cy - p.cy) || 1);
+      const uy = (e.cy - p.cy) / (Math.hypot(e.cx - p.cx, e.cy - p.cy) || 1);
+      const rel = (e.vx - p.vx) * ux + (e.vy - p.vy) * uy;
+      if (rel < -40) {
+        // 衝過來的物體：相對速度反向，越重越快消耗越多
+        e.vx -= 2 * rel * ux;
+        e.vy -= 2 * rel * uy;
+        spend += Math.min(20, Math.max(2, (e.mass * -rel) / 40));
+      } else if (e.isEnemy) {
+        // 貼著的敵人：推開
+        e.vx += ux * 160;
+        e.vy += uy * 160;
+        spend += 2;
+      } else continue;
+      e.reflectCd = 0.25;
+      e.stunT = Math.max(e.stunT ?? 0, 0.3);
+      rf.flash = 0.15;
+      this.burst(qx, qy, '#ffb347', 6);
+    }
+    for (const e of this.entities) if (e.reflectCd > 0) e.reflectCd -= dt;
+    p.mp -= spend;
+    if (p.mp <= 0) { p.mp = 0; this.endReflect(true); }
+  }
+
+  endReflect(empty) {
+    if (!this.reflect) return;
+    this.reflect = null;
+    this.cooldowns.reflect = empty ? cfg.reflectCdEmpty : cfg.reflectCd;
+    if (empty) this.toast('MP 耗盡，反射中斷');
+  }
+
+  // 電磁加速：把身邊（railRange 內）離游標最近的金屬物體朝游標方向射出。回傳是否成功
+  fireRail() {
+    const p = this.player;
+    const o = p.shoulder();
+    const cands = this.entities.filter((e) => e.isBody && e.alive && e.isMetal && e.mass <= cfg.railMaxMass && distToRect(o.x, o.y, e) <= cfg.railRange);
+    if (!cands.length) {
+      const heavy = this.entities.some((e) => e.isBody && e.alive && e.isMetal && distToRect(o.x, o.y, e) <= cfg.railRange);
+      this.toast(heavy ? '太重了，射不出去' : '身邊沒有金屬');
+      return false;
+    }
+    const m = this.mouse;
+    const t = cands.reduce((a, b) => (Math.hypot(a.cx - m.x, a.cy - m.y) <= Math.hypot(b.cx - m.x, b.cy - m.y) ? a : b));
+    let dx = m.x - t.cx;
+    let dy = m.y - t.cy;
+    const d = Math.hypot(dx, dy);
+    if (d < 4) { dx = p.facing; dy = 0; } else { dx /= d; dy /= d; }
+    if (this.grab?.target === t) this.endGrab();
+    t.rewind = null;
+    t.vx = dx * cfg.railSpeed;
+    t.vy = dy * cfg.railSpeed;
+    t.railT = cfg.railTime;
+    t.railLast = { x: t.cx, y: t.cy };
+    // 發射的閃光：從角色到物體一道閃電
+    this.bolts.push({ x1: o.x, y1: o.y, x2: t.cx, y2: t.cy, life: 0.2 });
+    this.burst(t.cx, t.cy, '#bfefff', 14);
+    return true;
+  }
+
+  // 電磁加速飛行中的物體：沿路留下閃電
+  updateRails(dt) {
+    for (const e of this.entities) {
+      if (!(e.railT > 0)) continue;
+      e.railT -= dt;
+      if (e.alive && e.railLast) {
+        this.bolts.push({ x1: e.railLast.x, y1: e.railLast.y, x2: e.cx, y2: e.cy, life: 0.3 });
+        e.railLast = { x: e.cx, y: e.cy };
+      }
+    }
+    for (const b of this.bolts) b.life -= dt;
+    this.bolts = this.bolts.filter((b) => b.life > 0);
+    for (const id in this.cooldowns) this.cooldowns[id] = Math.max(0, this.cooldowns[id] - dt);
   }
 
   // 時間倒轉：物體沿著過去的路徑倒退回去。由網打中物體時呼叫
@@ -578,6 +707,12 @@ export class World {
     const p = this.player;
     if (this.pendingRoom !== null) return;
     if (cfg.godMode && !respawn) return;
+    // 向量反射中：擋下接觸傷害（尖刺、掉落仍會回到入口）
+    if (this.reflect && !respawn) {
+      p.mp = Math.max(0, p.mp - cfg.reflectHitCost);
+      if (this.reflect) this.reflect.flash = 0.15;
+      return;
+    }
     if (!respawn && p.invT > 0) return;
     p.hp -= amount;
     if (p.hp <= 0) {
@@ -634,6 +769,8 @@ export class World {
     this.player.update(this, dt);
     this.updateChannels(dt);
     this.updateDirAim();
+    this.updateReflect(dt);
+    this.reflectLaser = false; // 這一幀的雷射重新計算時才設定
 
     if (this.pendingRoom === null) {
       this.updateGrab(dt);
@@ -644,6 +781,7 @@ export class World {
       this.resolveImpacts();
       this.updateSwitches();
       this.recordHistory();
+      this.updateRails(dt);
     }
 
     this.fields.followTargets();
@@ -712,10 +850,12 @@ export class World {
   updateSwitches() {
     for (const s of this.switches) s.update(this);
     if (!this.doorTiles.length) return;
-    // 魔王房間：打倒魔王才開門；其他房間：所有開關都啟動才開門
+    // 魔王房間：打倒魔王才開門；房間設定 openWhen: 'enemies'：打倒所有敵人才開門；其他房間：所有開關都啟動才開門
     const open = this.hasBoss
       ? !this.entities.some((e) => e.isBoss && e.alive)
-      : this.switches.length > 0 && this.switches.every((s) => s.pressed);
+      : this.room.openWhen === 'enemies'
+        ? !this.entities.some((e) => e.isEnemy && e.alive)
+        : this.switches.length > 0 && this.switches.every((s) => s.pressed);
     if (open === this.map.doorOpen) return;
     if (!open) {
       // 有東西卡在門的位置時先不要關門

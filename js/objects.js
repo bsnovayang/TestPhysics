@@ -23,7 +23,7 @@ export class Box extends Body {
       const pushed = this.pushV && this.groundAxis !== 'x';
       const slippery = this.isIce || this.onIce(world);
       if (pushed) this.vx = this.pushV;
-      else this.applyFriction(cfg.boxFriction * ldt * (slippery ? cfg.iceFriction : 1));
+      else if (!(this.railT > 0)) this.applyFriction(cfg.boxFriction * ldt * (slippery ? cfg.iceFriction : 1));
       this.clampVelocity();
       const { bx } = this.moveByVelocity(world, ldt);
       // 推動排在一起的箱子
@@ -342,8 +342,10 @@ export class MovableJammer extends Box {
 
 // 箱子生成器：箱子被拿走（離開生成點）或消失後，過一段時間補一個新的。
 // 同一個生成器產生的箱子超過上限時，最舊的那個會消失
+// kind = 'iron' 時生成鐵塊（地圖字元 N），否則生成木箱（@）
 export class BoxSpawner {
-  constructor(tx, ty) {
+  constructor(tx, ty, kind = 'box') {
+    this.kind = kind;
     this.tx = tx;
     this.ty = ty;
     this.x = tx * TILE;
@@ -370,7 +372,7 @@ export class BoxSpawner {
     if (world.rectBlocked(this.x, this.y, this.w, this.h, null)) return;
     if (world.bodies().some((b) => rectsOverlap(b, this))) return;
     this.timer = 0;
-    const box = new Box(this.tx, this.ty);
+    const box = this.kind === 'iron' ? new IronBlock(this.tx, this.ty) : new Box(this.tx, this.ty);
     world.entities.push(box);
     this.boxes.push(box);
     this.current = box;

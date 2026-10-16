@@ -85,8 +85,10 @@ export class Renderer {
     for (const e of world.entities) this.drawEntity(world, e);
     this.drawPlayer(world);
     if (world.water.drawSteamLayer) world.water.drawSteamLayer(this.ctx); else this.drawSteam(world);
+    this.drawReflect(world);
     this.drawBeams(world);
     this.drawProjectiles(world);
+    this.drawBolts(world);
     this.drawParticles(world);
     this.drawFieldOutlines(world);
     this.drawStasisArrows(world);
@@ -342,7 +344,7 @@ export class Renderer {
       }
     }
     // 門上的圖案畫在中間那一格
-    if (doors.length && !world.map.doorOpen && !world.hasBoss) {
+    if (doors.length && !world.map.doorOpen && !world.hasBoss && world.room.openWhen !== 'enemies') {
       const mid = doors[Math.floor(doors.length / 2)];
       if (hasLock) this.drawLock(mid.tx * TILE + 8, mid.ty * TILE + 8, C.key);
       else if (world.switches.some((s) => s.kind === 'steam')) {
@@ -1128,6 +1130,58 @@ export class Renderer {
     }
   }
 
+  // 向量反射場：角色周圍一圈轉動的橘色六角形，反射成功時閃白
+  drawReflect(world) {
+    const rf = world.reflect;
+    if (!rf) return;
+    const ctx = this.ctx;
+    const p = world.player;
+    const R = cfg.reflectRadius;
+    const spin = world.time * 2;
+    ctx.strokeStyle = rf.flash > 0 ? '#ffffff' : 'rgba(255,179,71,0.85)';
+    ctx.lineWidth = rf.flash > 0 ? 2 : 1;
+    ctx.beginPath();
+    for (let i = 0; i <= 6; i++) {
+      const a = spin + (i / 6) * Math.PI * 2;
+      const x = Math.round(p.cx + Math.cos(a) * R) + 0.5;
+      const y = Math.round(p.cy + Math.sin(a) * R) + 0.5;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.12;
+    ctx.fillStyle = '#ffb347';
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // 電磁加速的閃電：鋸齒狀的青白色線，外層粗、內層白色細線，逐漸淡出
+  drawBolts(world) {
+    const ctx = this.ctx;
+    for (const b of world.bolts) {
+      const len = Math.hypot(b.x2 - b.x1, b.y2 - b.y1);
+      const n = Math.max(2, Math.round(len / 6));
+      const nx = -(b.y2 - b.y1) / (len || 1);
+      const ny = (b.x2 - b.x1) / (len || 1);
+      const pts = [];
+      for (let i = 0; i <= n; i++) {
+        const t = i / n;
+        const j = i === 0 || i === n ? 0 : (Math.random() - 0.5) * 8;
+        pts.push({ x: b.x1 + (b.x2 - b.x1) * t + nx * j, y: b.y1 + (b.y2 - b.y1) * t + ny * j });
+      }
+      ctx.globalAlpha = Math.min(1, b.life * 4);
+      for (const [color, width] of [['#5fd8ff', 3], ['#ffffff', 1]]) {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.beginPath();
+        pts.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)));
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = 1;
+    }
+  }
+
   // 重力抓取：從肩膀到被抓的物體一串紫色光點，物體外圍一圈
   drawGrab(world) {
     const g = world.grab;
@@ -1284,8 +1338,23 @@ export class Renderer {
       }
       ctx.fillStyle = C.dim;
       ctx.fillText(slot.label, x + 6, y + 8);
-      ctx.fillStyle = sk && p.mp >= cost ? C.hud : C.dim;
+      const cd = id ? world.cooldowns[id] ?? 0 : 0;
+      ctx.fillStyle = sk && p.mp >= cost && cd <= 0 ? C.hud : C.dim;
       ctx.fillText(sk ? sk.name : '—', x + 32, y + 8);
+      // 冷卻中：暗色進度條加剩餘秒數；維持中的向量反射：橘色外框
+      if (cd > 0) {
+        const total = id === 'reflect' ? cfg.reflectCdEmpty : id === 'railgun' ? cfg.railCd : 1;
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(x + 3, y, Math.round((slotW - 3) * Math.min(1, cd / total)), 15);
+        ctx.fillStyle = '#ffd34d';
+        ctx.textAlign = 'right';
+        ctx.fillText(cd.toFixed(1), x + slotW - 3, y + 8);
+        ctx.textAlign = 'left';
+      }
+      if (id === 'reflect' && world.reflect) {
+        ctx.strokeStyle = '#ffb347';
+        ctx.strokeRect(x + 0.5, y + 0.5, slotW - 1, 14);
+      }
     });
 
     ctx.fillStyle = C.dim;

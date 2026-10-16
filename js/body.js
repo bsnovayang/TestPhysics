@@ -56,7 +56,7 @@ export class Body {
   }
 
   applyGravity(ldt) {
-    if (this.held) return; // 被重力抓取抓住時，由抓取決定速度
+    if (this.held || this.railT > 0) return; // 被抓住或電磁加速飛行中：不受重力
     this.vx += this.mods.gx * ldt;
     this.vy += this.mods.gy * ldt;
     this.applyDrag(ldt);
@@ -98,7 +98,7 @@ export class Body {
   }
 
   clampVelocity() {
-    const m = cfg.maxSpeed;
+    const m = this.railT > 0 ? cfg.railSpeed : cfg.maxSpeed;
     this.vx = Math.max(-m, Math.min(m, this.vx));
     this.vy = Math.max(-m, Math.min(m, this.vy));
   }

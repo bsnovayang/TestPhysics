@@ -51,6 +51,23 @@ export const cfg = {
   rewindTime: 8,         // 時間倒轉最多倒回幾秒
   rewindSpeed: 2,        // 倒轉播放的速度（倍）
 
+  // 向量反射
+  reflectRadius: 28,     // 反射場的半徑（角色周圍）
+  reflectDrain: 10,      // 維持時每秒消耗的 MP
+  reflectBulletCost: 3,  // 每反射一發子彈額外消耗
+  reflectLaserCost: 15,  // 反射雷射時每秒額外消耗
+  reflectHitCost: 3,     // 擋下一次接觸傷害的消耗
+  reflectCd: 3,          // 結束後的冷卻秒數
+  reflectCdEmpty: 5,     // MP 用光被迫結束時的冷卻秒數
+
+  // 電磁加速
+  railRange: 48,         // 金屬物體要在身邊幾 px 內（約 3 格）
+  railMaxMass: 2,        // 射得出去的最大質量（鐵塊 2）
+  railSpeed: 900,        // 射出的速度（超過一般速度上限 600）
+  railTime: 0.5,         // 射出後這段時間不受重力、直線飛行
+  railCost: 25,          // 每次消耗的 MP
+  railCd: 2,             // 冷卻秒數
+
   // 空間
   blinkRange: 80,            // 約 5 格
   blinkThroughWalls: false,  // 之後解鎖
