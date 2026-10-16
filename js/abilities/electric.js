@@ -38,12 +38,12 @@ export const ElectricAbility = {
     for (let ty = 0; ty < ROWS; ty++) for (let tx = 0; tx < COLS; tx++) {
       const i = ty * COLS + tx;
       const c = this.map.get(tx, ty);
-      if (c === '-') kind[i] = CABLE;
+      if (c === '-' || c === '>' || c === '<') kind[i] = CABLE;
       else if (c === '+' || c === '*') kind[i] = BARE;
       else if (this.water.amount[i] >= 0.3 && c !== 'I') kind[i] = WATER;
     }
     for (const s of this.switches) if (s.kind === 'power') kind[s.ty * COLS + s.tx] = DEVICE;
-    for (const e of this.entities) if ((e.isGenerator || e.isElectromagnet) && e.alive) kind[e.ty * COLS + e.tx] = DEVICE;
+    for (const e of this.entities) if ((e.isGenerator || e.isElectromagnet || e.isTurbine) && e.alive) kind[e.ty * COLS + e.tx] = DEVICE;
     return kind;
   },
 
@@ -60,6 +60,7 @@ export const ElectricAbility = {
 
     // 電源
     for (const g of this.entities) if (g.isGenerator && g.on && g.alive) seedTile(g.ty * COLS + g.tx);
+    for (const t of this.entities) if (t.isTurbine && t.generating && t.alive) seedTile(t.ty * COLS + t.tx);
     const shocks = this.fields.list.filter((fl) => fl.skill.type === 'shock' && !this.fields.jammedAt(fl.x, fl.y, 'electric'));
     for (const fl of shocks) {
       for (let ty = 0; ty < ROWS; ty++) for (let tx = 0; tx < COLS; tx++) {

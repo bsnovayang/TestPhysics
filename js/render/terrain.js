@@ -23,6 +23,27 @@ export const TerrainRenderer = {
         const c = map.get(tx, ty);
         const x = tx * TILE;
         const y = ty * TILE;
+        if (c === '>' || c === '<') {
+          // 輸送帶：深色的皮帶，通電時箭頭紋路往輸送方向流動
+          ctx.fillStyle = '#2a2f3a';
+          ctx.fillRect(x, y, TILE, TILE);
+          ctx.fillStyle = '#3d4452';
+          ctx.fillRect(x, y, TILE, 3);
+          const on = world.isPowered(tx, ty);
+          const d = c === '>' ? 1 : -1;
+          const shift = on ? Math.floor(world.time * 30) % 8 : 0;
+          ctx.fillStyle = on ? '#ffe14d' : '#5a6070';
+          for (let k = -8; k < TILE + 8; k += 8) {
+            const ax = x + ((k + d * shift + 16) % 16);
+            if (ax < x || ax > x + TILE - 3) continue;
+            ctx.fillRect(ax + (d > 0 ? 0 : 2), y + 1, 1, 1);
+            ctx.fillRect(ax + 1, y + 1, 1, 1);
+          }
+          ctx.fillStyle = '#1c1f26';
+          ctx.fillRect(x + 3, y + 7, 3, 3);
+          ctx.fillRect(x + 10, y + 7, 3, 3);
+          continue;
+        }
         if (c === '-') {
           // 包覆導線：深色背景上一條黑色粗電纜（外層有包覆的紋路）；有電時電纜中間透出一條細細的黃光
           ctx.drawImage(wallTile(0), x, y);

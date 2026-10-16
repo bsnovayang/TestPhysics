@@ -15,6 +15,7 @@ import { ReflectFieldAbility } from './abilities/reflect-field.js';
 import { ThermalAbility } from './abilities/thermal.js';
 import { WindAbility } from './abilities/wind.js';
 import { ElectricAbility } from './abilities/electric.js';
+import { DeviceAbility } from './abilities/devices.js';
 import { RailgunAbility } from './abilities/railgun.js';
 import { RewindAbility } from './abilities/rewind.js';
 import { BlinkAbility } from './abilities/blink.js';
@@ -103,6 +104,7 @@ export class World {
     this.grab = null;
     this.allyOrder = null;
     this.possess = null;
+    this.ropes = null; // 繩子在第一次更新時和吊著的物體連起來
     this.cooldowns = {};
     this.bolts = [];
     if (this.room.loadout) this.loadout = [...this.room.loadout]; // 測試房間可以指定裝備
@@ -465,7 +467,10 @@ export class World {
       for (const p of this.projectiles) if (p.alive) p.update(this, dt);
       for (const b of this.portalTravelers()) this.portals.tryTeleport(this, b);
       this.resolveReflectFields(before);
+      this.updateTurbines(dt);
       this.updateElectric(dt);
+      this.updateConveyors(dt);
+      this.updateRopes(dt);
       this.resolveImpacts();
       this.updateSwitches();
       this.recordHistory();
@@ -558,4 +563,4 @@ export class World {
 }
 
 // 各種能力的邏輯放在 js/abilities/，掛到 World 上
-Object.assign(World.prototype, DirAimAbility, GrabAbility, ReflectFieldAbility, ThermalAbility, WindAbility, ElectricAbility, RailgunAbility, RewindAbility, BlinkAbility, CharmAbility, PossessAbility);
+Object.assign(World.prototype, DirAimAbility, GrabAbility, ReflectFieldAbility, ThermalAbility, WindAbility, ElectricAbility, DeviceAbility, RailgunAbility, RewindAbility, BlinkAbility, CharmAbility, PossessAbility);

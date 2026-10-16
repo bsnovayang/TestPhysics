@@ -105,6 +105,37 @@ export const EntityRenderer = {
       ctx.fillRect(e.x + 6, e.y + 6, 4, 4);
       return;
     }
+    if (e.isTurbine) {
+      // 渦輪發電機：外框加上旋轉的葉片；發電時葉片亮黃色
+      ctx.fillStyle = '#3b4250';
+      ctx.fillRect(e.x, e.y, e.w, e.h);
+      ctx.strokeStyle = e.generating ? '#ffe14d' : '#9aa7bd';
+      ctx.lineWidth = 2;
+      for (let k = 0; k < 3; k++) {
+        const a = e.angle + (k * Math.PI * 2) / 3;
+        ctx.beginPath();
+        ctx.moveTo(e.cx, e.cy);
+        ctx.lineTo(e.cx + Math.cos(a) * 6, e.cy + Math.sin(a) * 6);
+        ctx.stroke();
+      }
+      ctx.lineWidth = 1;
+      ctx.fillStyle = '#1c1f26';
+      ctx.fillRect(e.cx - 1, e.cy - 1, 2, 2);
+      return;
+    }
+    if (e.isRope) {
+      // 繩子：棕色的細線；被燒時變紅、冒火星
+      const b = Math.min(1, e.burn);
+      ctx.fillStyle = b > 0 ? `rgb(${Math.round(140 + b * 115)},${Math.round(100 - b * 40)},${Math.round(60 - b * 30)})` : '#8a6435';
+      ctx.fillRect(Math.round(e.x), Math.round(e.y), 2, e.h);
+      ctx.fillStyle = '#5a4026';
+      for (let k = 2; k < e.h; k += 5) ctx.fillRect(Math.round(e.x), Math.round(e.y) + k, 2, 1);
+      if (b > 0 && Math.floor(world.time * 15 + e.ty) % 3 === 0) {
+        ctx.fillStyle = '#ffb347';
+        ctx.fillRect(Math.round(e.x) - 1, Math.round(e.y + e.h * (1 - b)), 4, 2);
+      }
+      return;
+    }
     if (e.isElectromagnet) {
       // 電磁鐵：線圈，通電時發光並畫出吸引範圍
       ctx.fillStyle = '#3b4250';

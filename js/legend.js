@@ -10,7 +10,7 @@
 //   switch      (tx, ty) => 開關（全部啟動時門會打開）
 //   run         (tx, ty, 長度) => 物件：連續的同一個字元合成一個物件
 //   replaceWith 處理完之後地圖上留下的圖塊（預設是空地）
-import { Generator, Electromagnet, IronBlock, Box, BoxSpawner, MovingPlatform, Blade, Crusher, Switch, FixedJammer, MovableJammer, IceBlock, Cooler, Heater, SteamPlatform } from './objects.js';
+import { Turbine, RopeSeg, Generator, Electromagnet, IronBlock, Box, BoxSpawner, MovingPlatform, Blade, Crusher, Switch, FixedJammer, MovableJammer, IceBlock, Cooler, Heater, SteamPlatform } from './objects.js';
 import { Walker, Heavy, Jumper, Flyer, Turret, LaserEnemy } from './enemies.js';
 import { Presser, Balloon, CeilingWalker, ShieldSoldier, GravityBoss } from './gravity-enemies.js';
 import { Emitter, MirrorBox } from './light.js';
@@ -32,6 +32,8 @@ export const LEGEND = {
   '+': { name: '裸露金屬（實心、導電；通電時碰到會被電）', tile: true },
   '-': { name: '包覆導線（實心；只把電送給相連的導線、接頭、電器，不會電人，也不會傳給碰到它的東西）', tile: true },
   '*': { name: '接頭（裸露的端子：和碰到的導體相連，例如鐵塊；通電時碰到會被電）', tile: true },
+  '>': { name: '輸送帶（往右；通電時把上面的東西往右送；本身算包覆導線）', tile: true },
+  '<': { name: '輸送帶（往左）', tile: true },
   'E': { name: '怪物通道（只有敵人能通過，玩家和箱子過不去）', tile: true },
 
   // 玩家與液體
@@ -68,6 +70,8 @@ export const LEGEND = {
   'G': { name: '熄滅的火爐（空氣砲可以切換）', entity: (tx, ty) => new Heater(tx, ty, false), replaceWith: '#' },
   'A': { name: '發電機（嵌在牆裡，空氣砲可以開關；和相鄰的導體相連）', entity: (tx, ty) => new Generator(tx, ty, true), replaceWith: '#' },
   'a': { name: '發電機（一開始是關著的；空氣砲可以開關）', entity: (tx, ty) => new Generator(tx, ty, false), replaceWith: '#' },
+  'r': { name: '渦輪發電機（被蒸氣或風吹動就旋轉，轉起來時對相鄰的導體供電）', entity: (tx, ty) => new Turbine(tx, ty), replaceWith: '#' },
+  'y': { name: '繩子（從天花板垂下來，吊著正下方的物體；被熱源或熔岩燒斷）', entity: (tx, ty) => new RopeSeg(tx, ty) },
   'q': { name: '電磁鐵（嵌在牆裡，通電時吸引金屬；和相鄰的導體相連）', entity: (tx, ty) => new Electromagnet(tx, ty), replaceWith: '#' },
   '!': { name: '間歇噴發口', entity: (tx, ty) => new Vent(tx, ty) },
   '&': { name: '熔岩源', entity: (tx, ty) => new LiquidSource(tx, ty, 'lava', true) },

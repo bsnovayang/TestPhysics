@@ -300,6 +300,48 @@ export class Generator {
   }
 }
 
+// 渦輪發電機：被蒸氣或風吹動就旋轉，轉起來時是電源（和相鄰的導體相連）
+export class Turbine {
+  constructor(tx, ty) {
+    this.tx = tx;
+    this.ty = ty;
+    this.x = tx * TILE;
+    this.y = ty * TILE;
+    this.w = TILE;
+    this.h = TILE;
+    this.isTurbine = true;
+    this.spin = 0;
+    this.angle = 0;
+    this.generating = false;
+    this.alive = true;
+  }
+
+  get cx() { return this.x + this.w / 2; }
+  get cy() { return this.y + this.h / 2; }
+
+  update() {}
+}
+
+// 繩子的一段：一條直的繩子吊著正下方的物體，被熱源或熔岩燒斷（見 abilities/devices.js）
+export class RopeSeg {
+  constructor(tx, ty) {
+    this.tx = tx;
+    this.ty = ty;
+    this.x = tx * TILE + 7;
+    this.y = ty * TILE;
+    this.w = 2;
+    this.h = TILE;
+    this.isRope = true;
+    this.burn = 0;
+    this.alive = true;
+  }
+
+  get cx() { return this.x + this.w / 2; }
+  get cy() { return this.y + this.h / 2; }
+
+  update() {}
+}
+
 // 電磁鐵：嵌在金屬牆裡（那一格是 '+'），通電時吸引附近的金屬（和磁力場同一套規則）
 export class Electromagnet {
   constructor(tx, ty) {

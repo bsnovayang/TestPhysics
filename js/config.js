@@ -88,6 +88,12 @@ export const cfg = {
   shockStun: 0.8,        // 敵人被電到時麻痺的秒數
   magnetRadius: 64,      // 電磁鐵（通電時）吸引金屬的範圍
 
+  // 連動裝置
+  turbineSpinUp: 1.5,    // 渦輪被推動時每秒加速多少（轉速 0～1，到 0.5 開始發電）
+  turbineSpinDown: 0.6,  // 沒有東西推時每秒減速多少
+  conveyorSpeed: 60,     // 輸送帶的速度
+  ropeBurnTime: 0.8,     // 繩子被燒多久會斷
+
   // 空間
   blinkRange: 80,            // 約 5 格
   blinkThroughWalls: false,  // 之後解鎖
