@@ -95,6 +95,16 @@ export const FieldRenderer = {
       ctx.lineWidth = 1;
       this.drawArrow(f.x - 5, f.y, -1, 0, 6);
       this.drawArrow(f.x + 5, f.y, 1, 0, 6);
+    } else if (s.type === 'shock') {
+      // 通電場：閃電符號
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(f.x + 2, f.y - 8);
+      ctx.lineTo(f.x - 3, f.y + 1);
+      ctx.lineTo(f.x + 3, f.y - 1);
+      ctx.lineTo(f.x - 2, f.y + 8);
+      ctx.stroke();
+      ctx.lineWidth = 1;
     } else if (s.type === 'wind') {
       // 風場：三條沿著風向流動的短線
       const t = (Date.now() / 300) % 1;

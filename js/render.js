@@ -55,6 +55,7 @@ export class Renderer {
     if (!world.water.drawsLava) this.drawLava(world);
     this.fx?.draw(this.ctx, world);
     this.drawPortals(world);
+    this.drawEnergized(world);
     this.drawSwitchesAndDoors(world);
     this.drawJammerRanges(world);
     for (const e of world.entities) this.drawEntity(world, e);

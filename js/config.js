@@ -82,6 +82,12 @@ export const cfg = {
   windGround: 0.5,       // 玩家站在地上時的倍率（踩得住）
   windSteam: 0.5,        // 蒸氣像素每一幀被吹動一格的機率
 
+  // 電力
+  shockDamage: 1,        // 被電到的傷害（敵人每 shockInterval 秒一次；玩家照受傷的無敵時間）
+  shockInterval: 0.8,
+  shockStun: 0.8,        // 敵人被電到時麻痺的秒數
+  magnetRadius: 64,      // 電磁鐵（通電時）吸引金屬的範圍
+
   // 空間
   blinkRange: 80,            // 約 5 格
   blinkThroughWalls: false,  // 之後解鎖

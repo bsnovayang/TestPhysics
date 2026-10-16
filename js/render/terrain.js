@@ -23,6 +23,20 @@ export const TerrainRenderer = {
         const c = map.get(tx, ty);
         const x = tx * TILE;
         const y = ty * TILE;
+        if (c === '+') {
+          // 金屬牆／導線：灰藍色的金屬板，中間一條銅線；有電時銅線變亮黃色
+          ctx.fillStyle = '#4a5468';
+          ctx.fillRect(x, y, TILE, TILE);
+          ctx.fillStyle = '#6a7690';
+          ctx.fillRect(x, y, TILE, 1);
+          ctx.fillRect(x, y, 1, TILE);
+          ctx.fillStyle = world.isPowered(tx, ty) && Math.floor(world.time * 12 + tx) % 3 ? '#ffe14d' : '#b0753a';
+          ctx.fillRect(x, y + 7, TILE, 2);
+          ctx.fillRect(x + 7, y, 2, TILE);
+          ctx.fillStyle = '#2f3644';
+          for (const [bx, by] of [[2, 2], [13, 2], [2, 13], [13, 13]]) ctx.fillRect(x + bx, y + by, 1, 1);
+          continue;
+        }
         if (c === '#') {
           ctx.drawImage(wallTile(Math.floor(noise(tx, ty, 7) * 4)), x, y);
           if (!map.isSolid(tx, ty - 1) && ty > 0) ctx.drawImage(wallTop(), x, y);
@@ -202,6 +216,25 @@ export const TerrainRenderer = {
     this.ctx.drawImage(spikeTile(pointDown), x, y);
   },
 
+  // 通電的水格：黃色閃爍的電弧
+  drawEnergized(world) {
+    if (!world.energized) return;
+    const ctx = this.ctx;
+    ctx.fillStyle = '#ffe14d';
+    for (let i = 0; i < world.energized.length; i++) {
+      if (!world.energized[i] || !world.energizedWater?.[i]) continue;
+      const tx = i % COLS;
+      const ty = (i / COLS) | 0;
+      const t = Math.floor(world.time * 15 + tx * 7 + ty * 3);
+      if (t % 4) continue;
+      const x = tx * TILE + ((t * 5) % 12) + 2;
+      const y = ty * TILE + ((t * 3) % 10) + 3;
+      ctx.fillRect(x, y, 3, 1);
+      ctx.fillRect(x + 2, y + 1, 1, 2);
+      ctx.fillRect(x + 2, y + 3, 3, 1);
+    }
+  },
+
   drawSwitchesAndDoors(world) {
     const ctx = this.ctx;
     const hasLock = world.switches.some((s) => s.kind === 'lock');
@@ -271,6 +304,17 @@ export const TerrainRenderer = {
         }
         ctx.stroke();
         ctx.lineWidth = 1;
+        continue;
+      }
+      if (s.kind === 'power') {
+        // 通電門的開關：插座，有電時亮黃色
+        ctx.fillStyle = '#3b4250';
+        ctx.fillRect(x + 2, y + 2, TILE - 4, TILE - 4);
+        ctx.fillStyle = s.pressed ? '#ffe14d' : '#6b6340';
+        ctx.fillRect(x + 5, y + 5, 2, 6);
+        ctx.fillRect(x + 9, y + 5, 2, 6);
+        ctx.strokeStyle = s.pressed ? '#ffe14d' : '#7d869a';
+        ctx.strokeRect(x + 1.5, y + 1.5, TILE - 3, TILE - 3);
         continue;
       }
       if (s.kind === 'light') {

@@ -14,6 +14,7 @@ import { GrabAbility } from './abilities/grab.js';
 import { ReflectFieldAbility } from './abilities/reflect-field.js';
 import { ThermalAbility } from './abilities/thermal.js';
 import { WindAbility } from './abilities/wind.js';
+import { ElectricAbility } from './abilities/electric.js';
 import { RailgunAbility } from './abilities/railgun.js';
 import { RewindAbility } from './abilities/rewind.js';
 import { BlinkAbility } from './abilities/blink.js';
@@ -463,6 +464,7 @@ export class World {
       for (const p of this.projectiles) if (p.alive) p.update(this, dt);
       for (const b of this.portalTravelers()) this.portals.tryTeleport(this, b);
       this.resolveReflectFields(before);
+      this.updateElectric(dt);
       this.resolveImpacts();
       this.updateSwitches();
       this.recordHistory();
@@ -555,4 +557,4 @@ export class World {
 }
 
 // 各種能力的邏輯放在 js/abilities/，掛到 World 上
-Object.assign(World.prototype, DirAimAbility, GrabAbility, ReflectFieldAbility, ThermalAbility, WindAbility, RailgunAbility, RewindAbility, BlinkAbility, CharmAbility, PossessAbility);
+Object.assign(World.prototype, DirAimAbility, GrabAbility, ReflectFieldAbility, ThermalAbility, WindAbility, ElectricAbility, RailgunAbility, RewindAbility, BlinkAbility, CharmAbility, PossessAbility);

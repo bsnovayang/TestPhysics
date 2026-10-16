@@ -33,6 +33,8 @@ export class FieldSystem {
     // 敵人自帶的重力盾（由 World 每幀更新）：{ x, y, r, value, owner }。
     // 和玩家的場域分開：不佔場上數量、不會被解除；疊加在基本重力上（不會取代它），擁有者自己不受影響
     this.innate = [];
+    // 通電的電磁鐵（由 World 每幀更新）：{ x, y, r, value }，和磁力場同一套規則
+    this.magnets = [];
   }
 
   // 重力盾往外推的加速度。點上有重力盾時，連同同一點的所有點重力一起加總，
@@ -200,6 +202,20 @@ export class FieldSystem {
     let gy = hasDir ? dirY : G * this.base.y;
     gx *= gMult;
     gy *= gMult;
+    // 通電的電磁鐵：只吸引金屬
+    if (self?.isMetal) {
+      for (const m of this.magnets) {
+        const dx = m.x - x;
+        const dy = m.y - y;
+        const d = Math.hypot(dx, dy);
+        if (d > m.r || d < 0.001) continue;
+        const k = (G * m.value * Math.min(1, d / 8)) / d;
+        addX += dx * k;
+        addY += dy * k;
+        drag += 3;
+        inField = true;
+      }
+    }
     gx += addX;
     gy += addY;
     // 重力盾：往外推，疊加在上面

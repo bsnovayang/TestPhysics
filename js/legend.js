@@ -10,7 +10,7 @@
 //   switch      (tx, ty) => 開關（全部啟動時門會打開）
 //   run         (tx, ty, 長度) => 物件：連續的同一個字元合成一個物件
 //   replaceWith 處理完之後地圖上留下的圖塊（預設是空地）
-import { IronBlock, Box, BoxSpawner, MovingPlatform, Blade, Crusher, Switch, FixedJammer, MovableJammer, IceBlock, Cooler, Heater, SteamPlatform } from './objects.js';
+import { Generator, Electromagnet, IronBlock, Box, BoxSpawner, MovingPlatform, Blade, Crusher, Switch, FixedJammer, MovableJammer, IceBlock, Cooler, Heater, SteamPlatform } from './objects.js';
 import { Walker, Heavy, Jumper, Flyer, Turret, LaserEnemy } from './enemies.js';
 import { Presser, Balloon, CeilingWalker, ShieldSoldier, GravityBoss } from './gravity-enemies.js';
 import { Emitter, MirrorBox } from './light.js';
@@ -29,6 +29,7 @@ export const LEGEND = {
   '|': { name: '移動平台的折返標記', tile: true },
   'I': { name: '冰牆格（會融化）', tile: true },
   'Z': { name: '熔岩', tile: true },
+  '+': { name: '金屬牆／導線（實心、導電；本身不會電人）', tile: true },
   'E': { name: '怪物通道（只有敵人能通過，玩家和箱子過不去）', tile: true },
 
   // 玩家與液體
@@ -51,6 +52,7 @@ export const LEGEND = {
   'R': { name: '光線接收器', switch: (tx, ty) => new Switch(tx, ty, 'light') },
   'W': { name: '蒸氣渦輪', switch: (tx, ty) => new Switch(tx, ty, 'steam') },
   'F': { name: '按鈕（踩過一次就鎖住）', switch: (tx, ty) => new Switch(tx, ty, 'button') },
+  'J': { name: '通電門的開關（這一格有電時啟動）', switch: (tx, ty) => new Switch(tx, ty, 'power') },
 
   // 機關與裝置
   'O': { name: '旋轉刀片', entity: (tx, ty) => new Blade(tx, ty) },
@@ -62,6 +64,8 @@ export const LEGEND = {
   // 火爐嵌在牆裡，水不會從它的位置漏出去
   'H': { name: '點燃的火爐', entity: (tx, ty) => new Heater(tx, ty, true), replaceWith: '#' },
   'G': { name: '熄滅的火爐（空氣砲可以切換）', entity: (tx, ty) => new Heater(tx, ty, false), replaceWith: '#' },
+  'A': { name: '發電機（嵌在金屬牆裡，空氣砲可以開關）', entity: (tx, ty) => new Generator(tx, ty, true), replaceWith: '+' },
+  'q': { name: '電磁鐵（嵌在金屬牆裡，通電時吸引金屬）', entity: (tx, ty) => new Electromagnet(tx, ty), replaceWith: '+' },
   '!': { name: '間歇噴發口', entity: (tx, ty) => new Vent(tx, ty) },
   '&': { name: '熔岩源', entity: (tx, ty) => new LiquidSource(tx, ty, 'lava', true) },
   '$': { name: '水源（空氣砲開關）', entity: (tx, ty) => new LiquidSource(tx, ty, 'water', false) },

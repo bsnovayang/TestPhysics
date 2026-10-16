@@ -95,6 +95,32 @@ export const EntityRenderer = {
       ctx.strokeRect(e.x + 0.5, e.y + 0.5, e.w - 1, e.h - 1);
       return;
     }
+    if (e.isGenerator) {
+      // 發電機：線圈加上閃爍的指示燈
+      ctx.fillStyle = '#3b4250';
+      ctx.fillRect(e.x + 1, e.y + 1, e.w - 2, e.h - 2);
+      ctx.fillStyle = '#b0753a';
+      for (let k = 0; k < 4; k++) ctx.fillRect(e.x + 3, e.y + 3 + k * 3, e.w - 6, 2);
+      ctx.fillStyle = e.on ? (Math.floor(world.time * 6) % 2 ? '#ffe14d' : '#fff6b0') : '#555';
+      ctx.fillRect(e.x + 6, e.y + 6, 4, 4);
+      return;
+    }
+    if (e.isElectromagnet) {
+      // 電磁鐵：線圈，通電時發光並畫出吸引範圍
+      ctx.fillStyle = '#3b4250';
+      ctx.fillRect(e.x + 1, e.y + 1, e.w - 2, e.h - 2);
+      ctx.fillStyle = e.powered ? '#ffe14d' : '#b0753a';
+      for (let k = 0; k < 4; k++) ctx.fillRect(e.x + 3 + k * 3, e.y + 3, 2, e.h - 6);
+      if (e.powered) {
+        ctx.strokeStyle = 'rgba(255,225,77,0.35)';
+        ctx.setLineDash([2, 4]);
+        ctx.beginPath();
+        ctx.arc(e.cx, e.cy, cfg.magnetRadius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      return;
+    }
     if (e.isHeater) {
       // 火爐：點燃時顯示範圍和發紅的爐口；熄滅時爐口是暗灰色
       if (e.on) {

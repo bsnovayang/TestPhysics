@@ -46,6 +46,11 @@ export const ActorRenderer = {
       }
     }
 
+    // 被電到：黃色閃爍
+    if (e.shocked && Math.floor(world.time * 20) % 2) {
+      ctx.fillStyle = 'rgba(255,225,77,0.55)';
+      ctx.fillRect(Math.round(e.x), Math.round(e.y), e.w, e.h);
+    }
     // 凍僵（在冷卻範圍裡）：淡藍色覆蓋
     if (e.chilled) {
       ctx.fillStyle = 'rgba(159,216,255,0.35)';

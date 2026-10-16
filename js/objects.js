@@ -273,6 +273,53 @@ export class Heater {
   }
 }
 
+// 發電機：一直對相鄰的導體供電。嵌在金屬牆裡（那一格是 '+'），空氣砲可以開關
+export class Generator {
+  constructor(tx, ty, on = true) {
+    this.tx = tx;
+    this.ty = ty;
+    this.x = tx * TILE;
+    this.y = ty * TILE;
+    this.w = TILE;
+    this.h = TILE;
+    this.isGenerator = true;
+    this.on = on;
+    this.hittable = true;
+    this.alive = true;
+  }
+
+  get cx() { return this.x + this.w / 2; }
+  get cy() { return this.y + this.h / 2; }
+
+  update() {}
+
+  onAirShot(world) {
+    this.on = !this.on;
+    world.toast(this.on ? '發電機啟動' : '發電機關閉');
+    world.burst(this.cx, this.cy, this.on ? '#ffe14d' : '#666666', 10);
+  }
+}
+
+// 電磁鐵：嵌在金屬牆裡（那一格是 '+'），通電時吸引附近的金屬（和磁力場同一套規則）
+export class Electromagnet {
+  constructor(tx, ty) {
+    this.tx = tx;
+    this.ty = ty;
+    this.x = tx * TILE;
+    this.y = ty * TILE;
+    this.w = TILE;
+    this.h = TILE;
+    this.isElectromagnet = true;
+    this.powered = false;
+    this.alive = true;
+  }
+
+  get cx() { return this.x + this.w / 2; }
+  get cy() { return this.y + this.h / 2; }
+
+  update() {}
+}
+
 // 蒸氣浮台：下方一格有蒸氣時被推上去，沒有蒸氣時落下；會載著站在上面的東西一起移動。
 // 一般的物體和玩家都不會被蒸氣推動，只有這種平台會
 export class SteamPlatform {
@@ -393,7 +440,7 @@ export class BoxSpawner {
 }
 
 // 開關。kind = 'lock'：只對鑰匙箱有反應；kind = 'plate'：任何有重量的物體都可以；
-// kind = 'light'：光線接收器，被光照到時啟動；kind = 'button'：按鈕，踩過一次就鎖住
+// kind = 'light'：光線接收器，被光照到時啟動；kind = 'button'：按鈕，踩過一次就鎖住；kind = 'power'：通電時啟動
 export class Switch {
   constructor(tx, ty, kind) {
     this.tx = tx;
@@ -401,7 +448,7 @@ export class Switch {
     this.kind = kind;
     this.pressed = false;
     this.lit = false;
-    if (kind === 'light' || kind === 'steam') {
+    if (kind === 'light' || kind === 'steam' || kind === 'power') {
       this.x = tx * TILE;
       this.y = ty * TILE;
       this.w = TILE;
@@ -423,6 +470,11 @@ export class Switch {
       const s = world.water.steamInRect(this.x - TILE, this.y, TILE * 3, TILE * 2);
       this.spin += (s + (this.pressed ? 0.1 : 0)) * dt * 20;
       if (s > 0.1) this.pressed = true;
+      return;
+    }
+    if (this.kind === 'power') {
+      // 通電門的開關：這一格有電時啟動（沒有電就關上，不會鎖住）
+      this.pressed = !!world.isPowered?.(this.tx, this.ty);
       return;
     }
     if (this.kind === 'light') {
