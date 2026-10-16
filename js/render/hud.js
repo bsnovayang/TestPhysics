@@ -58,7 +58,7 @@ export const HudRenderer = {
       ctx.fillStyle = 'rgba(0,0,0,0.55)';
       ctx.fillRect(x, y, slotW, 15);
       if (sk) {
-        ctx.fillStyle = TREE_COLORS[sk.tree];
+        ctx.fillStyle = sk.color ?? TREE_COLORS[sk.tree];
         ctx.fillRect(x, y, 3, 15);
       }
       ctx.fillStyle = C.dim;
@@ -68,7 +68,7 @@ export const HudRenderer = {
       ctx.fillText(sk ? sk.name : '—', x + 32, y + 8);
       // 冷卻中：暗色進度條加剩餘秒數；維持中的向量反射：橘色外框
       if (cd > 0) {
-        const total = id === 'reflect' ? cfg.reflectCdEmpty : id === 'railgun' ? cfg.railCd : id === 'possess' ? cfg.possessCd : 1;
+        const total = id === 'railgun' ? cfg.railCd : id === 'possess' ? cfg.possessCd : 1;
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
         ctx.fillRect(x + 3, y, Math.round((slotW - 3) * Math.min(1, cd / total)), 15);
         ctx.fillStyle = '#ffd34d';
@@ -83,10 +83,6 @@ export const HudRenderer = {
         ctx.textAlign = 'right';
         ctx.fillText(`${n}/${CHARM_LEVELS[cfg.charmLevel] ?? 1}`, x + slotW - 3, y + 8);
         ctx.textAlign = 'left';
-      }
-      if (id === 'reflect' && world.reflect) {
-        ctx.strokeStyle = '#ffb347';
-        ctx.strokeRect(x + 0.5, y + 0.5, slotW - 1, 14);
       }
     });
 

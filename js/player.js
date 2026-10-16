@@ -157,7 +157,7 @@ export class Player extends Body {
     const keys = ['KeyA', 'KeyD', 'KeyW', 'KeyS', 'Space', 'ShiftLeft', 'ShiftRight', 'Mouse0', 'KeyC', ...SLOT_KEYS.map((k) => k.code)];
     const still = this.grounded && Math.abs(this.vx) < 1 && Math.abs(this.vy) < 1
       && !keys.some((k) => input.isDown(k))
-      && !world.fields.channeling && !world.grab && !world.reflect && !world.possess;
+      && !world.fields.channeling && !world.grab && !world.possess;
     this.restLockT = (this.restLockT ?? 0) - dt;
     this.restT = still && this.restLockT <= 0 ? (this.restT ?? 0) + dt : 0;
     const near = world.entities.some((e) => e.isEnemy && e.alive && !e.friendly && Math.hypot(e.cx - this.cx, e.cy - this.cy) < cfg.restEnemyRange);

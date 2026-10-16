@@ -269,7 +269,7 @@ export const EntityRenderer = {
     const ctx = this.ctx;
     for (const pr of world.projectiles) {
       if (pr.skillId) {
-        const color = TREE_COLORS[SKILLS[pr.skillId].tree];
+        const color = SKILLS[pr.skillId].color ?? TREE_COLORS[SKILLS[pr.skillId].tree];
         ctx.strokeStyle = color;
         ctx.lineWidth = 1;
         ctx.beginPath();

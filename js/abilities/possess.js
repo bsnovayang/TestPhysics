@@ -8,7 +8,6 @@ export const PossessAbility = {
   startPossess(target) {
     if (target.isBoss) { this.toast('魔王不受影響'); this.refundSkill(); return; }
     if (this.grab) this.endGrab();
-    if (this.reflect) this.endReflect(false);
     this.dirAim = null;
     target.ally = false;
     target.possessed = true;

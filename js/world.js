@@ -11,7 +11,8 @@ import { ROOMS } from './rooms.js';
 import { LEGEND } from './legend.js';
 import { DirAimAbility } from './abilities/dir-aim.js';
 import { GrabAbility } from './abilities/grab.js';
-import { ReflectAbility } from './abilities/reflect.js';
+import { ReflectFieldAbility } from './abilities/reflect-field.js';
+import { ThermalAbility } from './abilities/thermal.js';
 import { RailgunAbility } from './abilities/railgun.js';
 import { RewindAbility } from './abilities/rewind.js';
 import { BlinkAbility } from './abilities/blink.js';
@@ -98,7 +99,6 @@ export class World {
     this.fields.clear();
     this.dirAim = null;
     this.grab = null;
-    this.reflect = null;
     this.allyOrder = null;
     this.possess = null;
     this.cooldowns = {};
@@ -257,13 +257,6 @@ export class World {
       this.toast('MP 不足');
       return;
     }
-    if (skill.type === 'reflect') {
-      if (this.reflect) return;
-      p.mp -= cost;
-      this.reflect = { key: keyCode, flash: 0 };
-      this.burst(p.cx, p.cy, '#ffb347', 12);
-      return;
-    }
     // 洗腦：游標不在敵人身上時是下指令（自己人走到游標的位置待命），不發射網、不耗 MP
     if (skill.type === 'charm') {
       const m = this.mouse;
@@ -400,12 +393,6 @@ export class World {
     if (this.pendingRoom !== null) return;
     if (cfg.godMode && !respawn) return;
     if (this.possess) return; // 附身中：本體被時間凍結，無敵
-    // 向量反射中：擋下接觸傷害（尖刺、掉落仍會回到入口）
-    if (this.reflect && !respawn) {
-      p.mp = Math.max(0, p.mp - cfg.reflectHitCost);
-      if (this.reflect) this.reflect.flash = 0.15;
-      return;
-    }
     if (!respawn && p.invT > 0) return;
     p.hp -= amount;
     if (p.hp <= 0) {
@@ -460,13 +447,12 @@ export class World {
     this.updateRisingLava(dt);
     this.water.update(this, dt);
     this.portals.update(dt, this);
+    const before = this.reflectMovers().map((m) => [m, m.cx, m.cy]);
     this.player.update(this, dt);
     this.updateChannels(dt);
     this.updateDirAim();
-    this.updateReflect(dt);
     this.updateCharm(dt);
     this.updatePossess(dt);
-    this.reflectLaser = false; // 這一幀的雷射重新計算時才設定
 
     if (this.pendingRoom === null) {
       this.updateGrab(dt);
@@ -474,6 +460,7 @@ export class World {
       for (const e of this.entities) if (e.alive && !e.rewind) e.update(this, dt);
       for (const p of this.projectiles) if (p.alive) p.update(this, dt);
       for (const b of this.portalTravelers()) this.portals.tryTeleport(this, b);
+      this.resolveReflectFields(before);
       this.resolveImpacts();
       this.updateSwitches();
       this.recordHistory();
@@ -566,4 +553,4 @@ export class World {
 }
 
 // 各種能力的邏輯放在 js/abilities/，掛到 World 上
-Object.assign(World.prototype, DirAimAbility, GrabAbility, ReflectAbility, RailgunAbility, RewindAbility, BlinkAbility, CharmAbility, PossessAbility);
+Object.assign(World.prototype, DirAimAbility, GrabAbility, ReflectFieldAbility, ThermalAbility, RailgunAbility, RewindAbility, BlinkAbility, CharmAbility, PossessAbility);

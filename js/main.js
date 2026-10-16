@@ -79,6 +79,7 @@ function buildLoadout() {
   });
   SKILL_ORDER.forEach((id, i) => {
     const sk = SKILLS[id];
+    if (sk.shelved) return; // 暫緩的技能（洗腦、附身）不列出，除錯按鍵仍然可以用
     const btn = document.createElement('button');
     btn.className = 'skill';
     btn.style.borderLeftColor = TREE_COLORS[sk.tree];

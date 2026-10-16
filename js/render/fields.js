@@ -15,7 +15,7 @@ export const FieldRenderer = {
     const ctx = this.ctx;
     for (const f of world.fields.list) {
       ctx.globalAlpha = 0.16;
-      ctx.fillStyle = TREE_COLORS[f.skill.tree];
+      ctx.fillStyle = (f.skill.color ?? TREE_COLORS[f.skill.tree]);
       ctx.beginPath();
       ctx.arc(f.x, f.y, this.fieldDrawR(f), 0, Math.PI * 2);
       ctx.fill();
@@ -26,7 +26,7 @@ export const FieldRenderer = {
   drawFieldOutlines(world) {
     const ctx = this.ctx;
     for (const f of world.fields.list) {
-      const color = TREE_COLORS[f.skill.tree];
+      const color = (f.skill.color ?? TREE_COLORS[f.skill.tree]);
       ctx.strokeStyle = color;
       ctx.globalAlpha = 0.5;
       // 附著的場域用虛線外框，和固定在原地的場域區分
@@ -86,6 +86,29 @@ export const FieldRenderer = {
       ctx.fillRect(f.x - 6, f.y + 4, 3, 2);
       ctx.fillRect(f.x + 4, f.y + 4, 3, 2);
       ctx.fillStyle = color;
+    } else if (s.type === 'reflectField') {
+      // 反射場：邊界畫成一圈粗的橘色
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(f.x, f.y, f.r - 1, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      this.drawArrow(f.x - 5, f.y, -1, 0, 6);
+      this.drawArrow(f.x + 5, f.y, 1, 0, 6);
+    } else if (s.type === 'heat') {
+      // 加熱：三道往上飄的熱浪
+      for (let k = -1; k <= 1; k++) {
+        const t = (Date.now() / 400 + k * 0.3) % 1;
+        ctx.fillRect(Math.round(f.x + k * 6), Math.round(f.y + 6 - t * 12), 2, 4);
+      }
+    } else if (s.type === 'cool') {
+      // 冷卻：雪花
+      for (const [ax, ay] of [[1, 0], [0, 1], [0.7, 0.7], [0.7, -0.7]]) {
+        ctx.beginPath();
+        ctx.moveTo(f.x - ax * 6, f.y - ay * 6);
+        ctx.lineTo(f.x + ax * 6, f.y + ay * 6);
+        ctx.stroke();
+      }
     } else if (s.type === 'timeMult') {
       ctx.beginPath();
       ctx.arc(f.x, f.y, 6, 0, Math.PI * 2);

@@ -46,6 +46,11 @@ export const ActorRenderer = {
       }
     }
 
+    // 凍僵（在冷卻範圍裡）：淡藍色覆蓋
+    if (e.chilled) {
+      ctx.fillStyle = 'rgba(159,216,255,0.35)';
+      ctx.fillRect(Math.round(e.x), Math.round(e.y), e.w, e.h);
+    }
     // 被附身：閃爍的粉紅色光圈，頭上一顆眼睛
     if (e.possessed) {
       ctx.strokeStyle = Math.floor(world.time * 8) % 2 ? '#ff7ad9' : '#ffffff';

@@ -119,7 +119,8 @@ export class Enemy extends Body {
 
   update(world, dt) {
     this.sample(world);
-    this.time = this.mods.time;
+    this.chilled = world.inCold(this); // 冷凍裝置或冷卻場：凍僵，動作變慢一半
+    this.time = this.mods.time * (this.chilled ? 0.5 : 1);
     const ldt = dt * this.time;
     this.stunT -= ldt;
     this.flashT -= dt;

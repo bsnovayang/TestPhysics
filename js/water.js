@@ -175,7 +175,7 @@ export class WaterSystem {
   update(world, dt) {
     this.frozen.clear();
     this.flip = !this.flip;
-    this.coolers = world.entities.filter((e) => e.isCooler && e.alive);
+    this.coolers = world.coldSources(); // 冷凍裝置與冷卻場：{ cx, cy, r }
     this.updateWater(world);
     this.updateLava(world);
     this.react(world);
@@ -300,7 +300,7 @@ export class WaterSystem {
 
         // 凝結回水：冷凍裝置附近凝結得很快；碰到天花板（往上那一格被擋住）也凝結得比較快，
         // 否則蒸氣會一直聚積在天花板下方（例如蒸氣浮台到頂後，火爐熄了也下不來）
-        const chilled = this.coolers.some((c) => Math.hypot(cx - c.cx, cy - c.cy) <= cfg.coldRadius);
+        const chilled = this.coolers.some((c) => Math.hypot(cx - c.cx, cy - c.cy) <= c.r);
         const dn = this.downAt(m);
         const capped = dn && (!this.inBounds(tx - dn.x, ty - dn.y) || this.blocked(tx - dn.x, ty - dn.y));
         const rateC = chilled ? 4 : capped ? cfg.steamCondense * 6 : cfg.steamCondense;
@@ -391,23 +391,23 @@ export class WaterSystem {
 
   updateTemperature(world, dt) {
     const A = this.amount;
-    const heaters = world.entities.filter((e) => e.isHeater && e.on && e.alive);
+    const heaters = world.heatSources(); // 火爐與加熱場：{ cx, cy, r }
     for (let ty = 0; ty < ROWS; ty++) {
       for (let tx = 0; tx < COLS; tx++) {
         const i = this.idx(tx, ty);
         const cx = tx * TILE + TILE / 2;
         const cy = ty * TILE + TILE / 2;
-        const near = (list, r) => list.some((c) => Math.hypot(cx - c.cx, cy - c.cy) <= r);
+        const near = (list) => list.some((c) => Math.hypot(cx - c.cx, cy - c.cy) <= c.r);
 
         // 火爐：範圍內的水沸騰、冰融化
-        if (heaters.length && near(heaters, cfg.heatRadius)) {
+        if (heaters.length && near(heaters)) {
           if (A[i] > 0.01) this.heatWater(tx, ty, dt);
           if (this.map.get(tx, ty) === 'I') this.heatTile(world, tx, ty, dt);
         }
 
         // 冷凍裝置：範圍內的水慢慢結成冰牆格（有東西在那一格時不結冰）
         // 像素版自己逐像素結冰（skipCellFreeze），這裡只處理整格結冰的版本
-        const chilled = !this.skipCellFreeze && A[i] >= 0.5 && near(this.coolers, cfg.coldRadius);
+        const chilled = !this.skipCellFreeze && A[i] >= 0.5 && near(this.coolers);
         if (!chilled) { this.cold[i] = 0; continue; }
         this.cold[i] += dt;
         if (this.cold[i] < cfg.freezeTime) continue;
@@ -427,7 +427,7 @@ export class WaterSystem {
       if (this.lava[i] <= 0.3 || this.frozenLava.has(i)) continue;
       const cx = tx * TILE + TILE / 2;
       const cy = ty * TILE + TILE / 2;
-      if (this.coolers.some((c) => Math.hypot(cx - c.cx, cy - c.cy) <= cfg.coldRadius)) {
+      if (this.coolers.some((c) => Math.hypot(cx - c.cx, cy - c.cy) <= c.r)) {
         this.lavaCold[i] += dt;
         if (this.lavaCold[i] >= cfg.freezeTime && !this.occupied(world, tx, ty)) { this.lavaCold[i] = 0; this.toStone(world, tx, ty); continue; }
       } else this.lavaCold[i] = 0;

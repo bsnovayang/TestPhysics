@@ -26,31 +26,6 @@ export const EffectRenderer = {
     }
   },
 
-  // 向量反射場：角色周圍一圈轉動的橘色六角形，反射成功時閃白
-  drawReflect(world) {
-    const rf = world.reflect;
-    if (!rf) return;
-    const ctx = this.ctx;
-    const p = world.player;
-    const R = cfg.reflectRadius;
-    const spin = world.time * 2;
-    ctx.strokeStyle = rf.flash > 0 ? '#ffffff' : 'rgba(255,179,71,0.85)';
-    ctx.lineWidth = rf.flash > 0 ? 2 : 1;
-    ctx.beginPath();
-    for (let i = 0; i <= 6; i++) {
-      const a = spin + (i / 6) * Math.PI * 2;
-      const x = Math.round(p.cx + Math.cos(a) * R) + 0.5;
-      const y = Math.round(p.cy + Math.sin(a) * R) + 0.5;
-      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-    ctx.lineWidth = 1;
-    ctx.globalAlpha = 0.12;
-    ctx.fillStyle = '#ffb347';
-    ctx.fill();
-    ctx.globalAlpha = 1;
-  },
-
   // 電磁加速的閃電：鋸齒狀的青白色線，外層粗、內層白色細線，逐漸淡出
   drawBolts(world) {
     const ctx = this.ctx;

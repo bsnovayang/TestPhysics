@@ -217,6 +217,8 @@ export class IceBlock extends Box {
   update(world, dt) {
     super.update(world, dt);
     this.heat = Math.max(0, this.heat - dt * 0.5);
+    // 在熱源（火爐、加熱場）範圍裡也會融化，和冰牆格同一套規則
+    if (this.alive && world.heatSources().some((h) => Math.hypot(this.cx - h.cx, this.cy - h.cy) <= h.r)) this.heatUp(world, dt);
   }
 
   heatUp(world, dt) {

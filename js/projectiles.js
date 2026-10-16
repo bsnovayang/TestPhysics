@@ -158,6 +158,15 @@ export class AirShot {
       if (bent) { this.dx = bent.x; this.dy = bent.y; }
       const nx = this.x + (this.dx * dist) / steps;
       const ny = this.y + (this.dy * dist) / steps;
+      // 反射場的邊界：彈開
+      const rn = world.reflectCross(this.x, this.y, nx, ny);
+      if (rn) {
+        const dot = this.dx * rn.x + this.dy * rn.y;
+        this.dx -= 2 * dot * rn.x;
+        this.dy -= 2 * dot * rn.y;
+        world.burst(this.x, this.y, '#ffb347', 3);
+        continue;
+      }
       const cross = world.portals.crossSegment(this.x, this.y, nx, ny);
       if (cross) {
         const d = cross.rotate(this.dx, this.dy);

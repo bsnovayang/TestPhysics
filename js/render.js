@@ -60,7 +60,6 @@ export class Renderer {
     for (const e of world.entities) this.drawEntity(world, e);
     this.drawPlayer(world);
     if (world.water.drawSteamLayer) world.water.drawSteamLayer(this.ctx); else this.drawSteam(world);
-    this.drawReflect(world);
     this.drawBeams(world);
     this.drawProjectiles(world);
     this.drawBolts(world);

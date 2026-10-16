@@ -120,7 +120,7 @@ export class ParticleWaterSystem extends WaterSystem {
     }
     this.frozen.clear();
     this.flip = !this.flip;
-    this.coolers = world.entities.filter((e) => e.isCooler && e.alive);
+    this.coolers = world.coldSources();
     this.stepParticles(world, dt);
     this.deriveGrid();
 

@@ -67,6 +67,13 @@ export class PixelWaterSystem extends WaterSystem {
     for (let y = 0; y < PER; y++) for (let x = 0; x < PER; x++) this.mat[this.fi(tx * PER + x, ty * PER + y)] = m;
   }
 
+  // 整格的熔岩凝固成石頭（冷凍裝置、冷卻場）：整格填滿石頭像素。
+  // 原本只改大格的標記，那一格裡已經有少量石頭像素時就不會轉換，下一幀又因為石頭不到四分之一而變回熔岩
+  toStone(world, tx, ty) {
+    super.toStone(world, tx, ty);
+    this.fillSolid(tx, ty, STONE);
+  }
+
   pointInLava(x, y) {
     const fx = Math.floor(x / FS);
     const fy = Math.floor(y / FS);
@@ -174,7 +181,7 @@ export class PixelWaterSystem extends WaterSystem {
   update(world, dt) {
     this.frame = (this.frame + 1) & 0xffff || 1;
     this.flip = !this.flip;
-    this.coolers = world.entities.filter((e) => e.isCooler && e.alive);
+    this.coolers = world.coldSources(); // 冷凍裝置與冷卻場：{ cx, cy, r }
     this.prepareTiles(world);
     this.buildMask(world);
     this.displace();
@@ -201,7 +208,7 @@ export class PixelWaterSystem extends WaterSystem {
         this.tDown[t * 2] = d ? d.x : 0;
         this.tDown[t * 2 + 1] = d ? d.y : 0;
         this.tTime[t] = m.time;
-        this.tCold[t] = this.coolers.some((c) => Math.hypot(cx - c.cx, cy - c.cy) <= cfg.coldRadius) ? 1 : 0;
+        this.tCold[t] = this.coolers.some((c) => Math.hypot(cx - c.cx, cy - c.cy) <= c.r) ? 1 : 0;
       }
     }
   }
@@ -218,6 +225,17 @@ export class PixelWaterSystem extends WaterSystem {
       }
     }
     for (let i = 0; i < this.mat.length; i++) if (this.mat[i] === ICE || this.mat[i] === STONE) this.mask[i] = 1;
+    // 反射場的邊界是一圈牆：外面的液體進不來、裡面的出不去
+    for (const rf of world.reflectFields?.() ?? []) {
+      const x0 = Math.max(0, Math.floor((rf.x - rf.r - 2) / FS));
+      const x1 = Math.min(FW - 1, Math.ceil((rf.x + rf.r + 2) / FS));
+      const y0 = Math.max(0, Math.floor((rf.y - rf.r - 2) / FS));
+      const y1 = Math.min(FH - 1, Math.ceil((rf.y + rf.r + 2) / FS));
+      for (let fy = y0; fy <= y1; fy++) for (let fx = x0; fx <= x1; fx++) {
+        const d = Math.hypot(fx * FS + FS / 2 - rf.x, fy * FS + FS / 2 - rf.y);
+        if (Math.abs(d - rf.r) <= FS * 0.8) this.mask[this.fi(fx, fy)] = 1;
+      }
+    }
     for (const e of world.entities) {
       if (!e.solid || !e.alive || e.isBullet) continue;
       const x0 = Math.max(0, Math.floor(e.x / FS));
@@ -476,13 +494,13 @@ export class PixelWaterSystem extends WaterSystem {
 
   // 火爐和熔岩也會融化不到半格、已經不是實心的殘冰
   meltRemnants(world, dt) {
-    const heaters = world.entities.filter((e) => e.isHeater && e.on && e.alive);
+    const heaters = world.heatSources(); // 火爐與加熱場：{ cx, cy, r }
     for (let ty = 0; ty < ROWS; ty++) for (let tx = 0; tx < COLS; tx++) {
       const t = this.idx(tx, ty);
       if (!this.iceN[t] || this.map.get(tx, ty) === 'I') continue;
       const cx = tx * TILE + TILE / 2;
       const cy = ty * TILE + TILE / 2;
-      if (heaters.some((h) => Math.hypot(cx - h.cx, cy - h.cy) <= cfg.heatRadius)) this.meltPixels(tx, ty, dt);
+      if (heaters.some((h) => Math.hypot(cx - h.cx, cy - h.cy) <= h.r)) this.meltPixels(tx, ty, dt);
     }
   }
 
