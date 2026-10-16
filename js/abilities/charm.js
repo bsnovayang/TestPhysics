@@ -59,18 +59,25 @@ export const CharmAbility = {
     let best = null;
     let bd = range;
     for (const e of this.entities) {
-      if (!e.isEnemy || !e.alive || e.ally || e.isBoss || e === from) continue;
+      if (!e.isEnemy || !e.alive || e.friendly || e.isBoss || e === from) continue;
       const d = Math.hypot(e.cx - from.cx, e.cy - from.cy);
       if (d < bd) { bd = d; best = e; }
     }
     return best;
   },
 
-  // 敵人的對手：玩家或自己人中最近的
+  // 玩家這一邊：玩家（附身時改成被附身的敵人，本體被時間凍結不會被瞄準）與自己人
+  playerSide() {
+    const lead = this.possess ? this.possess.target : this.player;
+    return [lead, ...this.allies()];
+  },
+
+  // 敵人的對手：玩家這一邊最近的
   nearestTarget(from) {
-    let best = this.player;
-    let bd = Math.hypot(this.player.cx - from.cx, this.player.cy - from.cy);
-    for (const e of this.allies()) {
+    const side = this.playerSide();
+    let best = side[0];
+    let bd = Math.hypot(best.cx - from.cx, best.cy - from.cy);
+    for (const e of side.slice(1)) {
       const d = Math.hypot(e.cx - from.cx, e.cy - from.cy);
       if (d < bd) { bd = d; best = e; }
     }

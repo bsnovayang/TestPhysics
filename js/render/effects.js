@@ -113,6 +113,25 @@ export const EffectRenderer = {
 
   // 定向重力施放中：從起點到游標的方向箭頭
   // 洗腦的指令位置：粉紅色的小旗子
+  // 附身中：本體被時停泡泡包住
+  drawPossessBody(world) {
+    if (!world.possess) return;
+    const ctx = this.ctx;
+    const p = world.player;
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = '#4aa8ff';
+    ctx.beginPath();
+    ctx.arc(p.cx, p.cy, 20, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = '#9fd8ff';
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.arc(p.cx, p.cy, 20, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  },
+
   drawAllyOrder(world) {
     const o = world.allyOrder;
     if (!o || !world.allies().length) return;

@@ -73,6 +73,11 @@ export const cfg = {
   charmDrain: 6,         // 每控制一隻，每秒消耗的 MP
   allySight: 260,        // 自己人會去攻擊多遠以內的敵人
 
+  // 附身
+  possessDrain: 10,      // 附身時每秒消耗的 MP
+  possessCd: 3,          // 回到本體後的冷卻秒數
+  possessStun: 1,        // 附身結束後，那隻敵人暈眩的秒數
+
   // 空間
   blinkRange: 80,            // 約 5 格
   blinkThroughWalls: false,  // 之後解鎖

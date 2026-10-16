@@ -46,6 +46,19 @@ export const ActorRenderer = {
       }
     }
 
+    // 被附身：閃爍的粉紅色光圈，頭上一顆眼睛
+    if (e.possessed) {
+      ctx.strokeStyle = Math.floor(world.time * 8) % 2 ? '#ff7ad9' : '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(Math.round(e.x) - 3, Math.round(e.y) - 3, e.w + 6, e.h + 6);
+      ctx.lineWidth = 1;
+      const hx = Math.round(e.cx);
+      const hy = Math.round(e.y) - 10;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(hx - 3, hy, 7, 3);
+      ctx.fillStyle = '#ff7ad9';
+      ctx.fillRect(hx - 1, hy, 3, 3);
+    }
     // 自己人（被洗腦）：粉紅色外框，頭上一顆愛心，血量一直顯示
     if (e.ally) {
       ctx.strokeStyle = '#ff7ad9';
@@ -56,7 +69,7 @@ export const ActorRenderer = {
       for (const [x, y, w] of [[-3, 0, 2], [1, 0, 2], [-3, 1, 6], [-2, 2, 4], [-1, 3, 2]]) ctx.fillRect(hx + x, hy + y, w, 1);
     }
     // 血量
-    if ((e.ally || !e.armored) && !e.isBoss && e.hp < e.maxHp) {
+    if ((e.friendly || !e.armored) && !e.isBoss && e.hp < e.maxHp) {
       for (let i = 0; i < e.maxHp; i++) {
         ctx.fillStyle = i < e.hp ? '#ff6b6b' : '#444';
         ctx.fillRect(e.x + i * 4, e.y - 5, 3, 2);

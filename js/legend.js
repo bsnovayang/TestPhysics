@@ -29,6 +29,7 @@ export const LEGEND = {
   '|': { name: '移動平台的折返標記', tile: true },
   'I': { name: '冰牆格（會融化）', tile: true },
   'Z': { name: '熔岩', tile: true },
+  'E': { name: '怪物通道（只有敵人能通過，玩家和箱子過不去）', tile: true },
 
   // 玩家與液體
   'P': { name: '起點', spawn: true },
@@ -49,6 +50,7 @@ export const LEGEND = {
   'S': { name: '壓板', switch: (tx, ty) => new Switch(tx, ty, 'plate') },
   'R': { name: '光線接收器', switch: (tx, ty) => new Switch(tx, ty, 'light') },
   'W': { name: '蒸氣渦輪', switch: (tx, ty) => new Switch(tx, ty, 'steam') },
+  'F': { name: '按鈕（踩過一次就鎖住）', switch: (tx, ty) => new Switch(tx, ty, 'button') },
 
   // 機關與裝置
   'O': { name: '旋轉刀片', entity: (tx, ty) => new Blade(tx, ty) },

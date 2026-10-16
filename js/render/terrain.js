@@ -60,6 +60,15 @@ export const TerrainRenderer = {
           ctx.fillRect(x, y + 3 + wave, TILE, 2);
           ctx.fillStyle = 'rgba(255,210,120,0.8)';
           ctx.fillRect(x + ((world.time * 10 + tx * 7) % TILE), y + 8, 3, 2);
+        } else if (c === 'E') {
+          // 怪物通道：上下兩端的紅色感應器，中間是閃爍的紅色光柵（只有敵人能通過）
+          ctx.fillStyle = '#5a2a30';
+          ctx.fillRect(x + 2, y, 12, 2);
+          ctx.fillRect(x + 2, y + TILE - 2, 12, 2);
+          ctx.globalAlpha = 0.45 + Math.sin(world.time * 8 + ty) * 0.2;
+          ctx.fillStyle = '#ff4d5e';
+          for (const bx of [4, 8, 12]) ctx.fillRect(x + bx - 1, y + 2, 1, TILE - 4);
+          ctx.globalAlpha = 1;
         } else if (c === '^') {
           this.drawSpike(x, y, map.isSolid(tx, ty - 1) && !map.isSolid(tx, ty + 1));
         } else if (c === '|' && cfg.showHitboxes) {
@@ -276,7 +285,15 @@ export const TerrainRenderer = {
         ctx.strokeRect(x + 0.5, y + 0.5, TILE - 1, TILE - 1);
         continue;
       }
-      const color = s.kind === 'lock' ? C.key : C.plate;
+      const color = s.kind === 'lock' ? C.key : s.kind === 'button' ? '#ffb347' : C.plate;
+      // 按鈕：圓頂，踩過一次就保持亮著
+      if (s.kind === 'button') {
+        ctx.fillStyle = '#3b4250';
+        ctx.fillRect(x + 2, y + 14, TILE - 4, 2);
+        ctx.fillStyle = s.pressed ? color : '#8a5a2a';
+        ctx.fillRect(x + 5, y + (s.pressed ? 13 : 10), 6, s.pressed ? 1 : 4);
+        continue;
+      }
       ctx.fillStyle = s.pressed ? color : '#555c6b';
       ctx.fillRect(x + 1, y + (s.pressed ? 14 : 12), TILE - 2, s.pressed ? 2 : 4);
       if (s.kind === 'lock') this.drawLock(x + 8, y + 5, s.pressed ? C.key : '#c9b26a');

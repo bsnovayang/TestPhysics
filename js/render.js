@@ -71,6 +71,7 @@ export class Renderer {
     this.drawGrab(world);
     this.drawRewinds(world);
     this.drawAllyOrder(world);
+    this.drawPossessBody(world);
     this.drawPreview(world);
     if (cfg.showHitboxes) this.drawHitboxes(world);
     this.drawHud(world);

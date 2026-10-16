@@ -101,7 +101,8 @@ input.onKey((code) => {
       toggleLoadout();
       break;
     case 'Escape':
-      if (!overlays.levels.hidden) toggleLevels(false);
+      if (world.possess) world.endPossess();
+      else if (!overlays.levels.hidden) toggleLevels(false);
       else if (!overlays.loadout.hidden) toggleLoadout(false);
       else { paused = !paused; overlays.help.hidden = !paused; }
       break;

@@ -47,6 +47,13 @@ export class Player extends Body {
   update(world, dt) {
     const input = world.input;
     this.sample(world);
+    // 附身中：本體被時間凍結，不動也不受操作（輸入交給被附身的敵人）
+    if (world.possess) {
+      this.vx = 0;
+      this.vy = 0;
+      this.timeScale = 0;
+      return;
+    }
 
     const hasted = this.hasteT > 0 && !world.fields.jammedAt(this.cx, this.cy, 'time');
     let t = this.mods.time * (hasted ? 2 : 1);

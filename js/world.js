@@ -1,4 +1,4 @@
-import { cfg, COLS, ROWS } from './config.js';
+import { cfg, COLS, ROWS, SLOT_KEYS } from './config.js';
 import { TileMap } from './tilemap.js';
 import { Field, FieldSystem } from './fields.js';
 import { SKILLS, DEFAULT_LOADOUT, isFieldSkill } from './skills.js';
@@ -16,6 +16,7 @@ import { RailgunAbility } from './abilities/railgun.js';
 import { RewindAbility } from './abilities/rewind.js';
 import { BlinkAbility } from './abilities/blink.js';
 import { CharmAbility } from './abilities/charm.js';
+import { PossessAbility } from './abilities/possess.js';
 import { makeRng } from './rng.js';
 
 function parseRoom(def) {
@@ -99,6 +100,7 @@ export class World {
     this.grab = null;
     this.reflect = null;
     this.allyOrder = null;
+    this.possess = null;
     this.cooldowns = {};
     this.bolts = [];
     if (this.room.loadout) this.loadout = [...this.room.loadout]; // 測試房間可以指定裝備
@@ -209,6 +211,8 @@ export class World {
   // 碰撞查詢：回傳 'tile'、擋住的實心物件，或 null
   rectBlocked(x, y, w, h, self) {
     if (this.solidTiles(x, y, w, h)) return 'tile';
+    // 怪物通道：只有敵人能通過
+    if (self && !self.isEnemy && this.map.anyTileInRect(x, y, w, h, (tx, ty) => this.map.get(tx, ty) === 'E')) return 'tile';
     if (self?.restsOnSpikes && this.map.rectSpikes(x, y, w, h)) return 'tile';
     if (this.water?.frozenOverlap(x, y, w, h, self)) return 'tile'; // 被時停的水是實心的
     for (const e of this.entities) {
@@ -227,6 +231,11 @@ export class World {
       if (x > e.x - pad && x < e.x + e.w + pad && y > e.y - pad && y < e.y + e.h + pad) return e;
     }
     return null;
+  }
+
+  // 技能欄第 slot 格的按鍵代碼
+  slotKey(slot) {
+    return SLOT_KEYS[slot]?.code ?? null;
   }
 
   castSkill(slot, keyCode) {
@@ -390,6 +399,7 @@ export class World {
     const p = this.player;
     if (this.pendingRoom !== null) return;
     if (cfg.godMode && !respawn) return;
+    if (this.possess) return; // 附身中：本體被時間凍結，無敵
     // 向量反射中：擋下接觸傷害（尖刺、掉落仍會回到入口）
     if (this.reflect && !respawn) {
       p.mp = Math.max(0, p.mp - cfg.reflectHitCost);
@@ -454,6 +464,7 @@ export class World {
     this.updateDirAim();
     this.updateReflect(dt);
     this.updateCharm(dt);
+    this.updatePossess(dt);
     this.reflectLaser = false; // 這一幀的雷射重新計算時才設定
 
     if (this.pendingRoom === null) {
@@ -554,4 +565,4 @@ export class World {
 }
 
 // 各種能力的邏輯放在 js/abilities/，掛到 World 上
-Object.assign(World.prototype, DirAimAbility, GrabAbility, ReflectAbility, RailgunAbility, RewindAbility, BlinkAbility, CharmAbility);
+Object.assign(World.prototype, DirAimAbility, GrabAbility, ReflectAbility, RailgunAbility, RewindAbility, BlinkAbility, CharmAbility, PossessAbility);

@@ -391,7 +391,7 @@ export class BoxSpawner {
 }
 
 // 開關。kind = 'lock'：只對鑰匙箱有反應；kind = 'plate'：任何有重量的物體都可以；
-// kind = 'light'：光線接收器，被光照到時啟動
+// kind = 'light'：光線接收器，被光照到時啟動；kind = 'button'：按鈕，踩過一次就鎖住
 export class Switch {
   constructor(tx, ty, kind) {
     this.tx = tx;
@@ -431,6 +431,9 @@ export class Switch {
     const candidates = this.kind === 'lock'
       ? world.entities.filter((e) => e instanceof Box && e.key && e.alive)
       : world.bodies();
-    this.pressed = candidates.some((b) => rectsOverlap(this, b));
+    const now = candidates.some((b) => rectsOverlap(this, b));
+    // 按鈕：踩過一次就鎖住（附身的敵人離開後門也不會關上）
+    if (this.kind === 'button') this.pressed = this.pressed || now;
+    else this.pressed = now;
   }
 }

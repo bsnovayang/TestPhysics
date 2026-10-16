@@ -29,6 +29,31 @@ export class Presser extends Walker {
     this.slamming = false;
   }
 
+  // 被附身：可以走動；左鍵跳起來重踩，落地的震波打到附近的敵人
+  controlled(world, ldt) {
+    this.slamCd -= ldt;
+    if (this.grounded && this.groundAxis === 'y' && this.slamming) this.landSlam(world);
+    if (this.slamming) return;
+    super.controlled(world, ldt);
+  }
+
+  attack() {
+    if (!this.grounded || this.groundAxis !== 'y' || this.slamCd > 0) return false;
+    this.vy = -this.groundSign * 300;
+    this.vx = 0;
+    this.slamming = true;
+    return true;
+  }
+
+  landSlam(world) {
+    this.slamming = false;
+    this.slamCd = 1.2;
+    world.burst(this.cx, this.groundSign > 0 ? this.y + this.h : this.y, '#c9b8ff', 18);
+    for (const v of this.victims(world)) {
+      if (v.grounded && Math.abs(v.cx - this.cx) < 64 && Math.abs(v.cy - this.cy) < 32) this.strike(world, v, 1);
+    }
+  }
+
   think(world, ldt) {
     this.slamCd -= ldt;
     const p = this.foe(world);
@@ -67,12 +92,13 @@ export class Balloon extends Enemy {
     this.mass = 3;
     this.armored = true;
     this.contactDamage = 1;
+    this.flies = true; // 被附身時 W／S 上下
     this.color = '#5fc8a8';
     this.dropT = 1.5;
   }
 
   physics(world, ldt) {
-    const p = this.foe(world) ?? (this.ally ? this.allyGoal(world) : world.player);
+    const p = this.moveTarget(world);
     // 浮力固定往上（大小等於正常重力），所以實際受力 = 場域重力 - 正常重力
     const ax = this.mods.gx;
     let ay = this.mods.gy - cfg.gravity;
@@ -95,9 +121,17 @@ export class Balloon extends Enemy {
     if (p && this.dropT <= 0 && Math.abs(p.cx - this.cx) < 20 && p.cy > this.cy) {
       this.dropT = 1.6;
       const b = new Bullet(this.cx, this.y + this.h + 4, 0, 150);
-      b.friendly = this.ally;
+      b.friendly = this.friendly;
       world.entities.push(b);
     }
+  }
+
+  // 被附身：左鍵往下丟炸彈
+  attack(world) {
+    const b = new Bullet(this.cx, this.y + this.h + 4, 0, 150);
+    b.friendly = true;
+    world.entities.push(b);
+    return true;
   }
 
   // 氣球很脆弱：撞到牆或天花板的速度超過 150 就破
@@ -133,6 +167,11 @@ export class CeilingWalker extends Walker {
     this.throwT = 1.5;
   }
 
+  // 被附身：左鍵朝游標丟石頭
+  attack(world, tx, ty) {
+    return this.shootAt(world, tx, ty, 140);
+  }
+
   sample(world) {
     super.sample(world);
     this.mods = { ...this.mods, gx: -this.mods.gx, gy: -this.mods.gy };
@@ -150,7 +189,7 @@ export class CeilingWalker extends Walker {
     this.throwT = 2;
     const d = Math.hypot(dx, dy);
     const b = new Bullet(this.cx, this.y + this.h + 4, (dx / d) * 140, (dy / d) * 140);
-    b.friendly = this.ally;
+    b.friendly = this.friendly;
     world.entities.push(b);
   }
 }
@@ -169,6 +208,11 @@ export class ShieldSoldier extends Walker {
     this.fireT = 2;
   }
 
+  // 被附身：左鍵朝游標開火
+  attack(world, tx, ty) {
+    return this.shootAt(world, tx, ty, 140, 10);
+  }
+
   think(world, ldt) {
     super.think(world, ldt);
     this.fireT -= ldt;
@@ -181,7 +225,7 @@ export class ShieldSoldier extends Walker {
     const d = Math.hypot(dx, dy);
     if (d < 1 || d > 300) return;
     const b = new Bullet(this.cx + (dx / d) * 10, this.cy + (dy / d) * 10, (dx / d) * 110, (dy / d) * 110);
-    b.friendly = this.ally;
+    b.friendly = this.friendly;
     world.entities.push(b);
   }
 }
@@ -202,7 +246,7 @@ export class BossMinion extends Heavy {
 
   think(world, ldt) {
     if (this.ally) { super.think(world, ldt); return; }
-    const p = this.foe(world);
+    const p = this.foe(world) ?? world.player;
     const dx = p.cx - this.cx;
     const sameLevel = Math.abs(p.cy - this.cy) < 24;
     // 不同層時，水平很近就不再轉向（否則會在玩家正上方的平台邊緣來回走、一直掉不下去）

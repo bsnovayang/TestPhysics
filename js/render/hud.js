@@ -68,7 +68,7 @@ export const HudRenderer = {
       ctx.fillText(sk ? sk.name : '—', x + 32, y + 8);
       // 冷卻中：暗色進度條加剩餘秒數；維持中的向量反射：橘色外框
       if (cd > 0) {
-        const total = id === 'reflect' ? cfg.reflectCdEmpty : id === 'railgun' ? cfg.railCd : 1;
+        const total = id === 'reflect' ? cfg.reflectCdEmpty : id === 'railgun' ? cfg.railCd : id === 'possess' ? cfg.possessCd : 1;
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
         ctx.fillRect(x + 3, y, Math.round((slotW - 3) * Math.min(1, cd / total)), 15);
         ctx.fillStyle = '#ffd34d';
@@ -183,6 +183,9 @@ export const HudRenderer = {
     } else if (world.dirAim) {
       text = '移動游標決定方向，放開確定';
       color = '#d0b0ff';
+    } else if (world.possess) {
+      text = '附身中：左鍵攻擊，再按一次或 Esc 回到本體';
+      color = '#ff7ad9';
     } else if (world.grab) {
       text = '移動游標搬運，放開丟出';
       color = '#d0b0ff';

@@ -112,6 +112,13 @@ export class Web {
       this.alive = false;
       return;
     }
+    // 附身：一定要打中敵人
+    if (SKILLS[this.skillId].type === 'possess') {
+      if (!target?.isEnemy) return this.fail(world, '附身要瞄準敵人');
+      world.startPossess(target);
+      this.alive = false;
+      return;
+    }
     // 時間倒轉：一定要打中物體
     if (SKILLS[this.skillId].type === 'rewind') {
       if (!target) return this.fail(world, '時間倒轉要瞄準物體');
@@ -219,7 +226,7 @@ export class Bullet {
     }
     if (this.solid) return;
     if (this.friendly) {
-      const enemy = world.entities.find((e) => e.isEnemy && e.alive && !e.ally && world.overlap(this, e));
+      const enemy = world.entities.find((e) => e.isEnemy && e.alive && !e.friendly && world.overlap(this, e));
       if (enemy) {
         enemy.takeDamage(world, 2, { x: Math.sign(this.vx), y: Math.sign(this.vy) });
         this.alive = false;
@@ -239,7 +246,7 @@ export class Bullet {
       return;
     }
     // 也會打到自己人
-    const ally = world.entities.find((e) => e.ally && e.alive && world.overlap(this, e));
+    const ally = world.entities.find((e) => e.isEnemy && e.friendly && e.alive && world.overlap(this, e));
     if (ally) {
       ally.takeDamage(world, 1, { x: Math.sign(this.vx), y: Math.sign(this.vy) });
       this.alive = false;
