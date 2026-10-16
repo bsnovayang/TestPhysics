@@ -41,7 +41,7 @@ export class Body {
 
   // 依中心點取得場域參數，並判斷地面方向
   sample(world) {
-    this.mods = world.fields.sample(this.cx, this.cy);
+    this.mods = world.fields.sample(this.cx, this.cy, this);
     const ax = Math.abs(this.mods.gx);
     const ay = Math.abs(this.mods.gy);
     if (Math.max(ax, ay) < 1) {

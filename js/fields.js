@@ -28,6 +28,40 @@ export class FieldSystem {
   constructor() {
     this.list = [];
     this.jammers = []; // 由 World 每幀更新：{ x, y, r, kind }
+    // 整個房間的基本重力方向（重力魔王會轉動它）；預設向下
+    this.base = { x: 0, y: 1 };
+    // 敵人自帶的重力盾（由 World 每幀更新）：{ x, y, r, value, owner }。
+    // 和玩家的場域分開：不佔場上數量、不會被解除；疊加在基本重力上（不會取代它），擁有者自己不受影響
+    this.innate = [];
+  }
+
+  // 重力盾往外推的加速度。點上有重力盾時，連同同一點的所有點重力一起加總，
+  // 所以玩家在盾上放一個點重力（吸引）就能把盾抵消。shield：只算盾本身的推力大小
+  shieldPush(x, y) {
+    const G = cfg.gravity;
+    let px = 0;
+    let py = 0;
+    let inShield = false;
+    const add = (fx, fy, value) => {
+      const dx = fx - x;
+      const dy = fy - y;
+      const d = Math.hypot(dx, dy);
+      if (d < 0.001) return;
+      const k = (G * value * Math.min(1, d / 8)) / d;
+      px += dx * k;
+      py += dy * k;
+    };
+    for (const s of this.innate) {
+      if (Math.hypot(x - s.x, y - s.y) > s.r || this.jammedAt(x, y, 'gravity')) continue;
+      inShield = true;
+      add(s.x, s.y, s.value);
+    }
+    if (!inShield) return null;
+    const shield = Math.hypot(px, py);
+    for (const f of this.list) {
+      if (f.skill.type === 'gravityPoint' && f.contains(x, y) && !this.jammedAt(x, y, f.skill.tree)) add(f.x, f.y, f.skill.value);
+    }
+    return { x: px, y: py, shield };
   }
 
   // 這一點是否被干擾（tree：'gravity'、'time'、'space'）
@@ -96,7 +130,8 @@ export class FieldSystem {
   }
 
   // 取得某一點的物理參數。疊加規則：先加總方向型，再乘上所有倍率。
-  sample(x, y) {
+  // self：取樣的物體（它自己的重力盾不影響它自己）
+  sample(x, y, self = null) {
     const G = cfg.gravity;
     let dirX = 0;
     let dirY = 0;
@@ -140,10 +175,22 @@ export class FieldSystem {
       }
     }
 
-    let gx = hasDir ? dirX : 0;
-    let gy = hasDir ? dirY : G;
+    let gx = hasDir ? dirX : G * this.base.x;
+    let gy = hasDir ? dirY : G * this.base.y;
     gx *= gMult;
     gy *= gMult;
+    // 重力盾：往外推，疊加在上面
+    for (const sh of this.innate) {
+      if (sh.owner === self) continue;
+      const dx = sh.x - x; // 和點重力相同的算法：value 為負時往外推
+      const dy = sh.y - y;
+      const d = Math.hypot(dx, dy);
+      if (d > sh.r || d < 0.001 || this.jammedAt(x, y, 'gravity')) continue;
+      const k = (G * sh.value * Math.min(1, d / 8)) / d;
+      gx += dx * k;
+      gy += dy * k;
+      inField = true;
+    }
     const mag = Math.hypot(gx, gy);
     const maxG = G * cfg.maxGravityMult;
     if (mag > maxG) {

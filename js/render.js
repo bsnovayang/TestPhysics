@@ -2,6 +2,7 @@ import { cfg, TILE, COLS, ROWS, VIEW_W, VIEW_H, SLOT_KEYS } from './config.js';
 import { SKILLS, TREE_COLORS } from './skills.js';
 import { Box, BoxSpawner, MovingPlatform, Blade, Crusher } from './objects.js';
 import { Heavy, Jumper, Flyer, Turret, LaserEnemy } from './enemies.js';
+import { Presser, Balloon, CeilingWalker, ShieldSoldier, GravityBoss } from './gravity-enemies.js';
 import { Emitter, MirrorBox } from './light.js';
 import { heroSprites, HERO_ANIMS, enemySprites, wallTile, wallTop, spikeTile, doorTile, crateSprite, noise } from './pixel/art.js';
 
@@ -91,6 +92,7 @@ export class Renderer {
     this.drawPreview(world);
     if (cfg.showHitboxes) this.drawHitboxes(world);
     this.drawHud(world);
+    if (world.hasBoss) this.drawBossHud(world);
     this.drawCursor(world);
     const out = this.out;
     out.imageSmoothingEnabled = false;
@@ -336,7 +338,7 @@ export class Renderer {
       }
     }
     // 門上的圖案畫在中間那一格
-    if (doors.length && !world.map.doorOpen) {
+    if (doors.length && !world.map.doorOpen && !world.hasBoss) {
       const mid = doors[Math.floor(doors.length / 2)];
       if (hasLock) this.drawLock(mid.tx * TILE + 8, mid.ty * TILE + 8, C.key);
       else if (world.switches.some((s) => s.kind === 'steam')) {
@@ -689,8 +691,9 @@ export class Renderer {
       return;
     }
     if (e instanceof Box) {
-      if (e.w === 16 && e.h === 16) ctx.drawImage(crateSprite('box'), Math.round(e.x), Math.round(e.y));
-      else ctx.drawImage(crateSprite('box'), Math.round(e.x), Math.round(e.y), e.w, e.h);
+      const crate = crateSprite(e.isIron ? 'iron' : 'box');
+      if (e.w === 16 && e.h === 16) ctx.drawImage(crate, Math.round(e.x), Math.round(e.y));
+      else ctx.drawImage(crate, Math.round(e.x), Math.round(e.y), e.w, e.h);
       if (e.key) this.drawKey(Math.round(e.cx), Math.round(e.cy), C.key);
       this.timeTint(e);
     } else if (e instanceof MovingPlatform) {
@@ -745,8 +748,11 @@ export class Renderer {
   drawEnemy(world, e) {
     const ctx = this.ctx;
     const up = e.groundAxis === 'y' && e.groundSign < 0;
-    const kind = e instanceof LaserEnemy ? 'laser' : e instanceof Heavy ? 'heavy' : e instanceof Jumper ? 'jumper'
+    const kind = e instanceof GravityBoss ? (e.phase === 2 ? 'boss2' : 'boss') : e instanceof Presser ? 'presser'
+      : e instanceof Balloon ? 'balloon' : e instanceof CeilingWalker ? 'ceiling' : e instanceof ShieldSoldier ? 'shield'
+      : e instanceof LaserEnemy ? 'laser' : e instanceof Heavy ? 'heavy' : e instanceof Jumper ? 'jumper'
       : e instanceof Flyer ? 'flyer' : e instanceof Turret ? 'turret' : 'walker';
+    if (e.shieldR) this.drawShield(world, e);
     const frames = enemySprites(kind);
     const fr = frames[Math.floor(world.time * (kind === 'flyer' ? 10 : 5) + e.x * 0.01) % 2];
     const img = e.flashT > 0 ? fr.flash : fr.canvas;
@@ -780,13 +786,61 @@ export class Renderer {
     }
 
     // 血量
-    if (!e.armored && e.hp < e.maxHp) {
+    if (!e.armored && !e.isBoss && e.hp < e.maxHp) {
       for (let i = 0; i < e.maxHp; i++) {
         ctx.fillStyle = i < e.hp ? '#ff6b6b' : '#444';
         ctx.fillRect(e.x + i * 4, e.y - 5, 3, 2);
       }
     }
     this.timeTint(e);
+  }
+
+  // 重力盾：紫色的虛線圈，被干擾時變暗
+  drawShield(world, e) {
+    const ctx = this.ctx;
+    const on = !world.fields.jammedAt(e.cx, e.cy, 'gravity');
+    const n = 28;
+    const spin = world.time * 1.5;
+    ctx.fillStyle = on ? 'rgba(201,168,255,0.85)' : 'rgba(120,120,140,0.5)';
+    for (let i = 0; i < n; i++) {
+      if (i % 2) continue;
+      const a = (i / n) * Math.PI * 2 + spin;
+      ctx.fillRect(Math.round(e.cx + Math.cos(a) * e.shieldR) - 1, Math.round(e.cy + Math.sin(a) * e.shieldR) - 1, 2, 2);
+    }
+  }
+
+  // 魔王房間：上方顯示魔王的血條、目前的重力方向與轉向預告
+  drawBossHud(world) {
+    const boss = world.entities.find((e) => e.isBoss && e.alive);
+    if (!boss) return;
+    const ctx = this.ctx;
+    const w = 200;
+    const x = Math.round(VIEW_W / 2 - w / 2);
+    const y = 334;
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(x - 2, y - 2, w + 4, 10);
+    ctx.fillStyle = '#3a3f4b';
+    ctx.fillRect(x, y, w, 6);
+    ctx.fillStyle = boss.phase === 2 ? '#d060c0' : '#a070ff';
+    ctx.fillRect(x, y, Math.round((boss.hp / boss.maxHp) * w), 6);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(x + w / 2, y, 1, 6); // 一半的位置：進入第二階段
+    // 轉向預告：在魔王身上和畫面四周閃爍箭頭
+    const d = boss.warnDir;
+    if (d && Math.floor(world.time * 6) % 2 === 0) {
+      ctx.fillStyle = '#ffd34d';
+      ctx.strokeStyle = '#ffd34d';
+      ctx.lineWidth = 2;
+      this.drawArrow(boss.cx + d.x * 30, boss.cy + d.y * 30, d.x, d.y, 14);
+      ctx.lineWidth = 1;
+      ctx.font = TEXT;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const name = d.y > 0 ? '下' : d.y < 0 ? '上' : d.x < 0 ? '左' : '右';
+      ctx.fillText(`重力即將轉向：${name}`, VIEW_W / 2, 320);
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+    }
   }
 
   drawPlayer(world) {

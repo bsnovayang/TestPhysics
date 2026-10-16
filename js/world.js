@@ -6,7 +6,8 @@ import { PortalSystem } from './portals.js';
 import { rectsOverlap, impactDamage } from './body.js';
 import { Player } from './player.js';
 import { Web } from './projectiles.js';
-import { Box, BoxSpawner, MovingPlatform, Blade, Crusher, Switch, FixedJammer, MovableJammer, IceBlock, Cooler, Heater, SteamPlatform } from './objects.js';
+import { Presser, Balloon, CeilingWalker, ShieldSoldier, GravityBoss } from './gravity-enemies.js';
+import { IronBlock, Box, BoxSpawner, MovingPlatform, Blade, Crusher, Switch, FixedJammer, MovableJammer, IceBlock, Cooler, Heater, SteamPlatform } from './objects.js';
 import { WaterSystem } from './water.js';
 import { Walker, Heavy, Jumper, Flyer, Turret, LaserEnemy } from './enemies.js';
 import { Emitter, MirrorBox } from './light.js';
@@ -68,6 +69,12 @@ function parseRoom(def) {
         case 'j': entities.push(new Jumper(tx, ty)); break;
         case 'f': entities.push(new Flyer(tx, ty)); break;
         case 'T': entities.push(new Turret(tx, ty)); break;
+        case 'p': entities.push(new Presser(tx, ty)); break;
+        case 'b': entities.push(new Balloon(tx, ty)); break;
+        case 'u': entities.push(new CeilingWalker(tx, ty)); break;
+        case 'g': entities.push(new ShieldSoldier(tx, ty)); break;
+        case 'm': entities.push(new GravityBoss(tx, ty)); break;
+        case 'n': entities.push(new IronBlock(tx, ty)); break;
         case 'V':
         case 'U':
         case '=': {
@@ -125,6 +132,8 @@ export class World {
     this.spawn = parsed.spawn;
     this.projectiles = [];
     this.fields.clear();
+    this.fields.base = { x: 0, y: 1 }; // 重力魔王轉過的重力，換房間或重來時恢復向下
+    this.hasBoss = this.entities.some((e) => e.isBoss);
     this.portals.clear();
     this.player.respawn(this.spawn);
     this.pendingRoom = null;
@@ -440,6 +449,9 @@ export class World {
     const jammers = this.entities.filter((e) => e.isJammer && e.alive).map((e) => ({ x: e.cx, y: e.cy, r: e.r, kind: e.kind }));
     this.fields.jammers = jammers;
     this.portals.jammers = jammers;
+    // 敵人自帶的重力盾
+    this.fields.innate = this.entities.filter((e) => e.shieldR && e.alive)
+      .map((e) => ({ x: e.cx, y: e.cy, r: e.shieldR, value: e.shieldValue, owner: e }));
     // 光線每幀重新計算：先清掉上一幀的光線與接收器狀態
     this.beams = [];
     for (const s of this.switches) s.lit = false;
@@ -519,7 +531,10 @@ export class World {
   updateSwitches() {
     for (const s of this.switches) s.update(this);
     if (!this.doorTiles.length) return;
-    const open = this.switches.length > 0 && this.switches.every((s) => s.pressed);
+    // 魔王房間：打倒魔王才開門；其他房間：所有開關都啟動才開門
+    const open = this.hasBoss
+      ? !this.entities.some((e) => e.isBoss && e.alive)
+      : this.switches.length > 0 && this.switches.every((s) => s.pressed);
     if (open === this.map.doorOpen) return;
     if (!open) {
       // 有東西卡在門的位置時先不要關門

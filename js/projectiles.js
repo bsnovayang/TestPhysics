@@ -3,6 +3,24 @@ import { Field } from './fields.js';
 import { SKILLS } from './skills.js';
 
 const WEB_STEP = 4;
+// 重力盾：從盾外飛進來的網和空氣砲會被彈開（沿盾的推力方向反射）。
+// 在盾裡面發射的不受影響；推力被玩家的點重力抵消到剩不到一半時也不會彈開
+const SHIELD_MIN_RATIO = 0.5;
+
+// 回傳反射後的單位方向；不用反射時回傳 null。started：這發是不是在盾裡面發射的
+function bounceByShield(world, x, y, dx, dy, startedInside) {
+  if (startedInside) return null;
+  const push = world.fields.shieldPush(x, y);
+  if (!push) return null;
+  const m = Math.hypot(push.x, push.y);
+  if (m < push.shield * SHIELD_MIN_RATIO) return null;
+  const nx = push.x / m;
+  const ny = push.y / m;
+  const dot = dx * nx + dy * ny;
+  if (dot >= 0) return null; // 已經在往外飛
+  world.burst(x, y, '#c9a8ff', 4);
+  return { x: dx - 2 * dot * nx, y: dy - 2 * dot * ny };
+}
 
 // 網：朝目標直線飛行，到達目標或碰到東西時展開場域。飛行中不受場域影響。
 // 擊中箱子或敵人時，場域會附著在對方身上。
@@ -29,8 +47,18 @@ export class Web {
       const dist = Math.hypot(dx, dy);
       if (dist < 0.001) return this.arrive(world);
       const step = Math.min(WEB_STEP, remaining, dist);
-      const nx = this.x + (dx / dist) * step;
-      const ny = this.y + (dy / dist) * step;
+      // 被重力盾彈開：方向改變，剩下的距離不變
+      if (this.startedInside === undefined) this.startedInside = !!world.fields.shieldPush(this.x, this.y);
+      const bent = bounceByShield(world, this.x, this.y, dx / dist, dy / dist, this.startedInside);
+      if (bent) {
+        this.tx = this.x + bent.x * dist;
+        this.ty = this.y + bent.y * dist;
+        this.dir = bent;
+      }
+      const ux = bent ? bent.x : dx / dist;
+      const uy = bent ? bent.y : dy / dist;
+      const nx = this.x + ux * step;
+      const ny = this.y + uy * step;
 
       // 一般的網可以穿過傳送門，從出口繼續飛完剩下的距離
       if (!this.isPortal) {
@@ -101,6 +129,9 @@ export class AirShot {
     const dist = cfg.cannonSpeed * dt * m.time;
     const steps = Math.max(1, Math.ceil(dist / 4));
     for (let i = 0; i < steps; i++) {
+      if (this.startedInside === undefined) this.startedInside = !!world.fields.shieldPush(this.x, this.y);
+      const bent = bounceByShield(world, this.x, this.y, this.dx, this.dy, this.startedInside);
+      if (bent) { this.dx = bent.x; this.dy = bent.y; }
       const nx = this.x + (this.dx * dist) / steps;
       const ny = this.y + (this.dy * dist) / steps;
       const cross = world.portals.crossSegment(this.x, this.y, nx, ny);

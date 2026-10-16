@@ -3,7 +3,7 @@ import { Body, approach, impactDamage } from './body.js';
 import { Bullet } from './projectiles.js';
 import { traceBeam, applyBeamHit } from './light.js';
 
-class Enemy extends Body {
+export class Enemy extends Body {
   constructor(tx, ty, w, h) {
     super(tx * TILE + (TILE - w) / 2, (ty + 1) * TILE - h, w, h);
     this.isEnemy = true;

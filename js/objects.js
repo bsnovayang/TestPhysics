@@ -47,6 +47,16 @@ export class Box extends Body {
   }
 }
 
+// 鐵塊：比木箱重（質量 2），會沉到水裡。重力魔王會丟出鐵塊；鐵塊高速撞上魔王會讓它受傷
+export class IronBlock extends Box {
+  constructor(tx, ty) {
+    super(tx, ty);
+    this.isIron = true;
+    this.mass = 2;
+    this.density = 3;
+  }
+}
+
 // 左右移動的平台（實心），會載著站在上面的物體一起移動。碰到牆或 '|' 標記時折返。
 export class MovingPlatform {
   constructor(tx, ty, widthTiles) {

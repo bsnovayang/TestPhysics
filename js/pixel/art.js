@@ -212,12 +212,36 @@ function enemySprite(kind, frame) {
     heavy: ['#e0605a', '#c0392b', '#7d2219'],
     turret: ['#c8d0d4', '#95a5a6', '#5f6b6c'],
     laser: ['#ff8ac0', '#e84393', '#9c2163'],
+    presser: ['#b0a2d0', '#7a6a9a', '#4a3f63'],
+    balloon: ['#a8f0d8', '#5fc8a8', '#2f8a70'],
+    ceiling: ['#9fe2f0', '#4fb0c6', '#2a6e80'],
+    shield: ['#c9b0ff', '#9b6bff', '#5f3fb0'],
+    boss: ['#d8c4ff', '#a070ff', '#5a34b0'],
+    boss2: ['#ffc4e8', '#d060c0', '#7a2a70'],
   }[kind].map(hex);
   const eye = hex('#1b1b1b');
   const white = hex('#ffffff');
   const leg = hex('#3a2a20');
   let b;
-  if (kind === 'heavy') {
+  if (kind === 'presser') {
+    // 重壓兵：方正的鐵砧身體，底部一塊厚重的踩板
+    b = new PixBuf(22, 22);
+    for (let y = 3; y <= 15; y++) for (let x = 3; x <= 18; x++) b.set(x, y, x < 6 || y < 5 ? P[0] : x > 15 || y > 13 ? P[2] : P[1]);
+    for (let y = 16; y <= 19; y++) for (let x = 2; x <= 19; x++) b.set(x, y, y === 16 ? hex('#8a8f9e') : hex('#5a5f6e'));
+    for (let x = 11; x <= 16; x++) b.set(x, 8, hex('#ffd34d')); // 一條瞇起來的眼睛
+    b.set(15, 7, white);
+    if (frame) for (let x = 4; x <= 17; x += 3) b.set(x, 20, hex('#5a5f6e'));
+  } else if (kind === 'balloon') {
+    // 氣球兵：上面是氣球、下面吊著小籃子和螺旋槳
+    b = new PixBuf(18, 22);
+    blob(b, 9, 7, 7, 7, P[0], P[1], P[2]);
+    b.set(6, 3, white); b.set(5, 4, white);
+    b.set(10, 7, eye); b.set(12, 7, eye);
+    for (let y = 14; y <= 16; y++) { b.set(6, y, hex('#3a2a20')); b.set(12, y, hex('#3a2a20')); }
+    for (let y = 17; y <= 19; y++) for (let x = 5; x <= 13; x++) b.set(x, y, y === 17 ? hex('#c99a5a') : hex('#8a6435'));
+    const px = frame ? [3, 4] : [14, 15];
+    for (const x of px) b.set(x, 18, hex('#d0d6e2'));
+  } else if (kind === 'heavy') {
     b = new PixBuf(24, 30);
     blob(b, 12, 15, 9, 11, P[0], P[1], P[2]);
     for (let x = 6; x <= 18; x++) b.set(x, 9, hex('#ffd34d')); // 頭盔的金色飾條
@@ -230,6 +254,18 @@ function enemySprite(kind, frame) {
     const wy = frame ? 4 : 9; // 翅膀上下拍
     for (let k = 0; k < 5; k++) { b.set(5 - k, wy + (k >> 1), P[2]); b.set(18 + k, wy + (k >> 1), P[2]); b.set(5 - k, wy + 1 + (k >> 1), P[0]); b.set(18 + k, wy + 1 + (k >> 1), P[0]); }
     b.set(13, 7, eye); b.set(15, 7, eye);
+  } else if (kind === 'boss' || kind === 'boss2') {
+    // 重力魔王：外圈是轉動的重力環，中間是核心；第二階段核心裂開、發出粉紅色的光
+    b = new PixBuf(36, 36);
+    const ring = hex('#6a4cc0');
+    for (let a = 0; a < 64; a++) {
+      const t = (a / 64) * Math.PI * 2 + (frame ? 0.1 : 0);
+      if (a % 8 < 5) b.set(18 + Math.cos(t) * 16, 18 + Math.sin(t) * 16, ring);
+    }
+    blob(b, 18, 18, 11, 11, P[0], P[1], P[2]);
+    blob(b, 18, 18, 5, 5, white, kind === 'boss2' ? hex('#ffd0f0') : hex('#efe4ff'), P[0]);
+    b.set(17, 17, eye); b.set(19, 17, eye);
+    if (kind === 'boss2') for (const [x, y] of [[10, 12], [11, 13], [12, 13], [13, 14], [25, 22], [24, 23], [23, 23], [26, 21]]) b.set(x, y, hex('#2a1030'));
   } else if (kind === 'turret') {
     b = new PixBuf(18, 18);
     blob(b, 9, 10, 7, 6, P[0], P[1], P[2]);
@@ -244,6 +280,8 @@ function enemySprite(kind, frame) {
     const feet = frame ? [4, 8, 11] : [5, 9, 12];
     for (const fx of feet) { b.set(fx, 15, leg); b.set(fx, 16, leg); }
     if (kind === 'jumper') for (let x = 3; x <= 14; x++) b.set(x, 14, P[2]); // 跳躍兵的後腿
+    if (kind === 'ceiling') for (const fx of feet) b.set(fx + 1, 16, hex('#d0d6e2')); // 倒吊兵的爪子（抓住天花板）
+    if (kind === 'shield') { for (let x = 9; x <= 14; x++) b.set(x, 5, hex('#ffd34d')); for (let y = 6; y <= 9; y++) b.set(14, y, hex('#ffd34d')); }
   }
   return addOutline(b);
 }
@@ -318,9 +356,10 @@ export function doorTile() {
 export function crateSprite(kind = 'box') {
   return baked('crate:' + kind, () => {
     const b = new PixBuf(16, 16);
-    const plank = hex('#b98a4f');
-    const dark = hex('#8a6435');
-    const light = hex('#d8a865');
+    const iron = kind === 'iron';
+    const plank = hex(iron ? '#5d6475' : '#b98a4f');
+    const dark = hex(iron ? '#3a3f4c' : '#8a6435');
+    const light = hex(iron ? '#8f98ab' : '#d8a865');
     for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
       let c = plank;
       if (x === 0 || y === 0) c = light;
@@ -328,6 +367,7 @@ export function crateSprite(kind = 'box') {
       if (kind === 'box' && (x === y || x === 15 - y) && x > 1 && x < 14) c = dark;
       b.set(x, y, c);
     }
+    if (iron) for (const [x, y] of [[3, 3], [12, 3], [3, 12], [12, 12]]) b.set(x, y, light); // 鉚釘
     if (kind === 'key') {
       const k = hex('#ffd34d');
       for (const [x, y] of [[4, 6], [5, 6], [4, 7], [5, 7], [3, 7], [6, 7], [4, 8], [5, 8], [7, 7], [8, 7], [9, 7], [10, 7], [11, 7], [10, 8], [11, 9], [9, 8]]) b.set(x, y, k);
