@@ -137,11 +137,14 @@ export class Web {
 
 // 空氣砲：傷害低、擊退中等。會受時間場域影響。
 export class AirShot {
-  constructor(x, y, dx, dy) {
+  // power：擊退倍率（蓄力砲 > 1）
+  constructor(x, y, dx, dy, power = 1) {
     this.x = x;
     this.y = y;
     this.dx = dx;
     this.dy = dy;
+    this.power = power;
+    this.range = cfg.cannonRange * (power > 1 ? cfg.chargeRange : 1);
     this.traveled = 0;
     this.alive = true;
   }
@@ -177,9 +180,11 @@ export class AirShot {
         continue;
       }
       // 先檢查物件再檢查牆：嵌在牆裡的裝置（例如火爐）才打得到
-      const hit = world.hitTest(nx, ny, 3, true);
+      // 蓄力砲比較大顆：從物體旁邊擦過也算打中（才能把旁邊的鐵塊斜斜地推上去）
+      const hit = world.hitTest(nx, ny, this.power > 1 ? 9 : 3, true);
       if (hit) {
-        hit.onAirShot(world, { x: this.dx, y: this.dy });
+        // 方向乘上威力：所有被擊退的東西（箱子、鐵塊、敵人）自然被推得更遠，傷害不變
+        hit.onAirShot(world, { x: this.dx * this.power, y: this.dy * this.power });
         world.burst(nx, ny, '#cfe8ff', 6);
         this.alive = false;
         return;
@@ -193,7 +198,7 @@ export class AirShot {
       this.y = ny;
     }
     this.traveled += dist;
-    if (this.traveled > cfg.cannonRange) this.alive = false;
+    if (this.traveled > this.range) this.alive = false;
   }
 }
 

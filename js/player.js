@@ -184,17 +184,25 @@ export class Player extends Body {
   handleActions(world) {
     const input = world.input;
 
-    // 空氣砲（按住連射）
-    if (input.isDown('Mouse0') && this.cannonCd <= 0) {
+    // 空氣砲：按一下射一發（連射要快速點按）；按住蓄力，放開時射出蓄力砲（擊退力大很多，可以把箱子、鐵塊射去撞魔王）
+    const fire = (power) => {
       const o = this.shoulder();
       let dx = world.mouse.x - o.x;
       let dy = world.mouse.y - o.y;
       const d = Math.hypot(dx, dy);
       if (d < 0.001) { dx = this.facing; dy = 0; } else { dx /= d; dy /= d; }
-      world.projectiles.push(new AirShot(o.x + dx * 6, o.y + dy * 6, dx, dy));
-      this.vx -= dx * cfg.recoil;
-      this.vy -= dy * cfg.recoil;
+      world.projectiles.push(new AirShot(o.x + dx * 6, o.y + dy * 6, dx, dy, power));
+      const kick = cfg.recoil * (power > 1 ? 2 : 1);
+      this.vx -= dx * kick;
+      this.vy -= dy * kick;
       this.cannonCd = 1 / cfg.cannonRate;
+    };
+    if (input.wasPressed('Mouse0') && this.cannonCd <= 0) fire(1);
+    if (input.isDown('Mouse0')) {
+      this.chargeT = (this.chargeT ?? 0) + world.dtReal;
+    } else {
+      if ((this.chargeT ?? 0) >= cfg.chargeTime) fire(cfg.chargePower);
+      this.chargeT = 0;
     }
 
     // 技能欄

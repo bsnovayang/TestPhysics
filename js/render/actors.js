@@ -51,6 +51,13 @@ export const ActorRenderer = {
       ctx.fillStyle = 'rgba(255,225,77,0.55)';
       ctx.fillRect(Math.round(e.x), Math.round(e.y), e.w, e.h);
     }
+    // 魔王的破綻：核心外露，閃爍的白框
+    if (e.isBoss && e.staggerT > 0 && Math.floor(world.time * 10) % 2) {
+      ctx.strokeStyle = '#ffd34d';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(Math.round(e.x) - 3, Math.round(e.y) - 3, e.w + 6, e.h + 6);
+      ctx.lineWidth = 1;
+    }
     // 凍僵（在冷卻範圍裡）：淡藍色覆蓋
     if (e.chilled) {
       ctx.fillStyle = 'rgba(159,216,255,0.35)';
@@ -130,6 +137,24 @@ export const ActorRenderer = {
     ctx.drawImage(img, -9, -19);
     ctx.restore();
 
+    // 蓄力中：管口聚集白色光點，蓄滿時閃爍
+    if ((p.chargeT ?? 0) > 0.15) {
+      const k = Math.min(1, p.chargeT / cfg.chargeTime);
+      const o2 = p.shoulder();
+      const a2 = Math.atan2(world.mouse.y - o2.y, world.mouse.x - o2.x);
+      const mx = Math.round(o2.x + Math.cos(a2) * 12);
+      const my = Math.round(o2.y + Math.sin(a2) * 12);
+      const full = k >= 1;
+      ctx.fillStyle = full && Math.floor(world.time * 12) % 2 ? '#ffffff' : '#cfe8ff';
+      const r = Math.round(1 + k * 3);
+      ctx.fillRect(mx - r, my - r, r * 2, r * 2);
+      if (!full) {
+        for (let i = 0; i < 4; i++) {
+          const a = world.time * 8 + (i * Math.PI) / 2;
+          ctx.fillRect(Math.round(mx + Math.cos(a) * (10 - k * 8)), Math.round(my + Math.sin(a) * (10 - k * 8)), 1, 1);
+        }
+      }
+    }
     // 指向游標的砲管：逐像素畫的短管，管口一點亮色
     const o = p.shoulder();
     const a = Math.atan2(world.mouse.y - o.y, world.mouse.x - o.x);

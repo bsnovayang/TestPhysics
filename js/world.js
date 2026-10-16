@@ -435,6 +435,7 @@ export class World {
 
   update(dt) {
     this.time += dt;
+    this.dtReal = dt; // 真實時間（蓄力等不受時間場域影響的計時用）
     // 干擾裝置的位置每幀更新（可移動的干擾器會跟著移動）
     const jammers = this.entities.filter((e) => e.isJammer && e.alive).map((e) => ({ x: e.cx, y: e.cy, r: e.r, kind: e.kind }));
     this.fields.jammers = jammers;
@@ -508,8 +509,8 @@ export class World {
         const rel = Math.hypot(rvx, rvy);
         if (rel <= cfg.impactThreshold) continue;
 
-        if (b.isEnemy) b.takeImpact(this, impactDamage(rel, a.mass));
-        if (a.isEnemy) a.takeImpact(this, impactDamage(rel, b.mass));
+        if (b.isEnemy) b.takeImpact(this, impactDamage(rel, a.mass), rel);
+        if (a.isEnemy) a.takeImpact(this, impactDamage(rel, b.mass), rel);
         // 鐵塊撞到敵人造成傷害後就碎掉（彈藥用一次）
         for (const e of [a, b]) if (e.isIron) e.shatter(this);
         // 魔王丟出的小兵被甩去撞魔王時也碎掉

@@ -308,10 +308,18 @@ export const EntityRenderer = {
         ctx.fillStyle = C.web;
         ctx.fillRect(pr.x - 1.5, pr.y - 1.5, 3, 3);
       } else {
-        ctx.fillStyle = C.shot;
+        // 蓄力砲：比較大、外圈白色
+        const big = (pr.power ?? 1) > 1;
+        ctx.fillStyle = big ? '#ffffff' : C.shot;
         ctx.beginPath();
-        ctx.arc(pr.x, pr.y, 2.5, 0, Math.PI * 2);
+        ctx.arc(pr.x, pr.y, big ? 5 : 2.5, 0, Math.PI * 2);
         ctx.fill();
+        if (big) {
+          ctx.fillStyle = C.shot;
+          ctx.beginPath();
+          ctx.arc(pr.x, pr.y, 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
     }
   },

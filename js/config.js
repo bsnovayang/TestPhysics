@@ -147,6 +147,10 @@ export const cfg = {
   cannonRange: 150,
   cannonImpulse: 280,    // 對質量 1 的物體造成的速度變化
   cannonDamage: 1,
+  chargeTime: 0.8,       // 按住多久變成蓄力砲
+  chargePower: 4,        // 蓄力砲的擊退倍率（傷害不變）：把箱子、鐵塊射出去撞魔王＝通用的傷害手段
+  chargeRange: 1.5,      // 蓄力砲的射程倍率
+  bossStagger: 2.5,      // 魔王被撞擊打中後失衡、露出核心的秒數：這段時間普通空氣砲也有效
   recoil: 50,
 
   // 撞擊傷害：速度超過門檻才會受傷，超過越多傷害越高；物體互撞時以相對速度計算並乘上撞過來那一方的質量

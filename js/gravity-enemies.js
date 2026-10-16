@@ -303,12 +303,12 @@ export const BOSS = {
   flipEvery: 7,      // 第 2 階段：重力向下維持 7 秒
   flipTime: 3,       // 第 2 階段：反轉持續 3 秒
   maxHit: 3,         // 一次撞擊最多扣的血
+  minImpact: 450,    // 撞擊速度要超過這個值才會受傷（一般敵人是 320）：蓄力砲射出的鐵塊約 550、從地面飛上來約 520
   blockEvery: 4,     // 每 4 秒丟一個鐵塊
   maxBlocks: 3,
   minionEvery: 5,    // 第 2 階段：每 5 秒丟一隻重裝兵
   maxMinions: 2,
   ringBullets: 10,   // 第 2 階段：每次重力轉向時射出的彈幕數量
-  coreRange: 72,     // 第 2 階段：距離這麼近時，空氣砲才打得到核心（站在最上層平台的內側就打得到）
 };
 
 export class GravityBoss extends Enemy {
@@ -333,6 +333,7 @@ export class GravityBoss extends Enemy {
     this.fireT = 2.5;
     this.moveT = 0;        // 換階段時移動到天花板的剩餘時間
     this.coreCd = 0;
+    this.staggerT = 0;     // 破綻：被撞擊打中後失衡、露出核心的剩餘時間
   }
 
   update(world, dt) {
@@ -342,6 +343,7 @@ export class GravityBoss extends Enemy {
     this.flashT -= dt;
     this.impactCd -= dt;
     this.coreCd -= dt;
+    this.staggerT -= dt;
     this.vx = 0;
     this.vy = 0;
     if (this.moveT > 0) {
@@ -349,8 +351,8 @@ export class GravityBoss extends Enemy {
       this.moveT = Math.max(0, this.moveT - dt);
       const k = 1 - this.moveT / 1.5;
       this.y = this.homeY + (this.ceilingY - this.homeY) * k;
-    } else if (ldt > 0) {
-      this.think(world, ldt);
+    } else if (ldt > 0 && this.staggerT <= 0) {
+      this.think(world, ldt); // 失衡中停止行動（重力轉向的計時也暫停）
     }
     if (world.overlap(this, world.player)) world.hurtPlayer(this.contactDamage, { fromX: this.cx });
   }
@@ -457,20 +459,26 @@ export class GravityBoss extends Enemy {
     }
   }
 
-  // 撞擊：每次最多扣 BOSS.maxHit；換階段移動中無敵
-  takeImpact(world, amount) {
+  // 撞擊：每次最多扣 BOSS.maxHit；換階段移動中無敵。被打中後失衡、露出核心（破綻）
+  // speed：撞擊的相對速度。魔王很硬：低於 BOSS.minImpact 的撞擊不痛（重力轉向時平台上的鐵塊滑過來撞到它，不會白白受傷）
+  takeImpact(world, amount, speed = Infinity) {
     if (amount <= 0 || this.moveT > 0) return;
+    if (speed < BOSS.minImpact) { world.popup(this.cx, this.y, '太慢了', '#9aa7bd'); return; }
     this.hurt(world, Math.min(BOSS.maxHit, amount));
+    if (this.alive) {
+      this.staggerT = cfg.bossStagger;
+      world.popup(this.cx, this.y - 6, '破綻！', '#ffd34d');
+    }
     if (this.alive && this.phase === 1 && this.hp <= this.maxHp / 2) this.enterPhase2(world);
   }
 
-  // 空氣砲：第 1 階段無效；第 2 階段靠近時打得到核心（每 0.5 秒最多 1 點）
+  // 空氣砲：平常無效；破綻中（被撞擊打中後）打得到核心（每 0.25 秒最多 1 點）
   takeDamage(world) {
-    const p = world.player;
-    if (this.phase === 2 && this.moveT <= 0 && Math.hypot(p.cx - this.cx, p.cy - this.cy) < BOSS.coreRange) {
+    if (this.staggerT > 0 && this.moveT <= 0) {
       if (this.coreCd <= 0) {
-        this.coreCd = 0.5;
+        this.coreCd = 0.25;
         this.hurt(world, 1);
+        if (this.alive && this.phase === 1 && this.hp <= this.maxHp / 2) this.enterPhase2(world);
       }
       return;
     }
