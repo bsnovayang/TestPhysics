@@ -181,20 +181,20 @@ export class ShieldSoldier extends Walker {
 // 鐵塊被重力（房間的或玩家的）甩去高速撞它才會受傷。空氣砲在第 1 階段對它無效
 // 第 1 階段：浮在房間中央，每隔一段時間轉動重力：下 → 上 → 下 → 左 → 下 → 右（轉向前有預告）。
 //   每次都先回到向下，所以「把鐵塊推到它正下方，等重力轉上」一定有機會
-const BOSS_CYCLE = [{ x: 0, y: 1 }, { x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 0 }];
+export const BOSS_CYCLE = [{ x: 0, y: 1 }, { x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 0 }];
 // 第 2 階段（血量一半以下）：吸到天花板上，重力回到向下，但會定期短暫反轉；這時靠近打它的核心也有效
 // ---------------------------------------------------------------------------
 const BOSS_DIRS = [{ x: 0, y: 1 }, { x: -1, y: 0 }, { x: 0, y: -1 }, { x: 1, y: 0 }];
 export const BOSS = {
   hp: 18,
   turnEvery: 6,      // 第 1 階段：每 6 秒轉一次
-  warn: 1.5,         // 轉向前的預告時間
+  warn: 3,           // 轉向前的預告時間（王身上的箭頭轉向下一個方向、倒數 3、2、1）
   flipEvery: 7,      // 第 2 階段：重力向下維持 7 秒
   flipTime: 3,       // 第 2 階段：反轉持續 3 秒
   maxHit: 3,         // 一次撞擊最多扣的血
   blockEvery: 4,     // 每 4 秒丟一個鐵塊
   maxBlocks: 3,
-  coreRange: 56,     // 第 2 階段：距離這麼近時，空氣砲才打得到核心
+  coreRange: 72,     // 第 2 階段：距離這麼近時，空氣砲才打得到核心（站在最上層平台的內側就打得到）
 };
 
 export class GravityBoss extends Enemy {
@@ -238,6 +238,13 @@ export class GravityBoss extends Enemy {
       this.think(world, ldt);
     }
     if (world.overlap(this, world.player)) world.hurtPlayer(this.contactDamage, { fromX: this.cx });
+  }
+
+  // 重力時鐘（畫面顯示用）：整個循環、目前在第幾個、距離下次轉向的時間與這一段的長度
+  clock(world) {
+    if (this.phase === 1) return { cycle: BOSS_CYCLE, index: this.dirIndex, timer: this.timer, period: BOSS.turnEvery };
+    const flipped = world.fields.base.y < 0;
+    return { cycle: [BOSS_DIRS[0], BOSS_DIRS[2]], index: flipped ? 1 : 0, timer: this.timer, period: flipped ? BOSS.flipTime : BOSS.flipEvery };
   }
 
   setGravity(world, d) {

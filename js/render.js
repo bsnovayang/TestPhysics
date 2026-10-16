@@ -809,14 +809,72 @@ export class Renderer {
     }
   }
 
-  // 魔王房間：上方顯示魔王的血條、目前的重力方向與轉向預告
+  // 魔王房間：畫面下方顯示重力時鐘與魔王的血條；王身上顯示目前的重力方向與倒數
   drawBossHud(world) {
     const boss = world.entities.find((e) => e.isBoss && e.alive);
     if (!boss) return;
     const ctx = this.ctx;
-    const w = 200;
-    const x = Math.round(VIEW_W / 2 - w / 2);
-    const y = 334;
+    const blink = Math.floor(world.time * 6) % 2 === 0;
+    const warn = !!boss.warnDir && boss.moveT <= 0;
+
+    // 王身上：外圈轉動的光點（預告時越轉越快），箭頭指向目前的重力方向，預告時改指下一個方向並閃爍
+    const spin = world.time * (warn ? 6 : 1.5);
+    ctx.fillStyle = warn ? '#ffd34d' : 'rgba(201,168,255,0.8)';
+    for (let i = 0; i < 6; i++) {
+      const a = spin + (i / 6) * Math.PI * 2;
+      ctx.fillRect(Math.round(boss.cx + Math.cos(a) * 21) - 1, Math.round(boss.cy + Math.sin(a) * 21) - 1, 2, 2);
+    }
+    const g = world.fields.base;
+    const d = warn ? boss.warnDir : g;
+    if (!warn || blink) {
+      ctx.strokeStyle = warn ? '#ffd34d' : '#ffffff';
+      ctx.lineWidth = 2;
+      this.drawArrow(boss.cx + d.x * 30, boss.cy + d.y * 30, d.x, d.y, 14);
+      ctx.lineWidth = 1;
+    }
+    ctx.font = TEXT;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if (warn) {
+      // 倒數 3、2、1（顯示在王的另一側，避免被箭頭擋住）
+      ctx.fillStyle = '#ffd34d';
+      ctx.fillText(String(Math.ceil(boss.timer)), Math.round(boss.cx - d.x * 32), Math.round(boss.cy - d.y * 32));
+    }
+
+    // 重力時鐘（畫在最下面那排地板上，不會擋住玩家）：整個循環排成一排，框起目前的方向；
+    // 下一格在預告時閃爍；下面的條是距離下次轉向的時間
+    const c = boss.clock(world);
+    const cell = 16;
+    const n = c.cycle.length;
+    const x0 = Math.round(VIEW_W / 2 - (n * cell) / 2);
+    const y0 = 339;
+    ctx.fillStyle = 'rgba(0,0,0,0.75)';
+    ctx.fillRect(x0 - 3, y0 - 2, n * cell + 6, cell + 3);
+    c.cycle.forEach((dir, i) => {
+      const cx = x0 + i * cell + cell / 2;
+      const cy = y0 + cell / 2;
+      const cur = i === c.index;
+      const next = i === (c.index + 1) % n;
+      if (cur) {
+        ctx.fillStyle = '#a070ff';
+        ctx.fillRect(x0 + i * cell + 1, y0, cell - 2, cell);
+      }
+      ctx.strokeStyle = cur ? '#ffffff' : next && warn ? (blink ? '#ffd34d' : '#7d869a') : next ? '#ffd34d' : '#7d869a';
+      ctx.lineWidth = 2;
+      this.drawArrow(cx, cy, dir.x, dir.y, 9);
+      ctx.lineWidth = 1;
+    });
+    ctx.fillStyle = '#3a3f4b';
+    ctx.fillRect(x0, y0 + cell - 1, n * cell, 2);
+    ctx.fillStyle = warn ? '#ffd34d' : '#c9a8ff';
+    ctx.fillRect(x0, y0 + cell - 1, Math.round((1 - Math.max(0, c.timer) / c.period) * n * cell), 2);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+
+    // 血條（中間的白線：進入第二階段的位置）
+    const w = 140;
+    const x = x0 + n * cell + 12;
+    const y = 344;
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
     ctx.fillRect(x - 2, y - 2, w + 4, 10);
     ctx.fillStyle = '#3a3f4b';
@@ -824,23 +882,7 @@ export class Renderer {
     ctx.fillStyle = boss.phase === 2 ? '#d060c0' : '#a070ff';
     ctx.fillRect(x, y, Math.round((boss.hp / boss.maxHp) * w), 6);
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(x + w / 2, y, 1, 6); // 一半的位置：進入第二階段
-    // 轉向預告：在魔王身上和畫面四周閃爍箭頭
-    const d = boss.warnDir;
-    if (d && Math.floor(world.time * 6) % 2 === 0) {
-      ctx.fillStyle = '#ffd34d';
-      ctx.strokeStyle = '#ffd34d';
-      ctx.lineWidth = 2;
-      this.drawArrow(boss.cx + d.x * 30, boss.cy + d.y * 30, d.x, d.y, 14);
-      ctx.lineWidth = 1;
-      ctx.font = TEXT;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const name = d.y > 0 ? '下' : d.y < 0 ? '上' : d.x < 0 ? '左' : '右';
-      ctx.fillText(`重力即將轉向：${name}`, VIEW_W / 2, 320);
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'alphabetic';
-    }
+    ctx.fillRect(x + w / 2, y, 1, 6);
   }
 
   drawPlayer(world) {
