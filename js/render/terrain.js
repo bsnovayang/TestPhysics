@@ -23,8 +23,41 @@ export const TerrainRenderer = {
         const c = map.get(tx, ty);
         const x = tx * TILE;
         const y = ty * TILE;
+        if (c === '-') {
+          // 包覆導線：深色背景上一條黑色粗電纜（外層有包覆的紋路）；有電時電纜中間透出一條細細的黃光
+          ctx.drawImage(wallTile(0), x, y);
+          const on = world.isPowered(tx, ty);
+          ctx.fillStyle = '#1c1f26';
+          ctx.fillRect(x, y + 5, TILE, 6);
+          ctx.fillStyle = '#2c313c';
+          for (let k = 1; k < TILE; k += 4) ctx.fillRect(x + k, y + 6, 1, 4);
+          ctx.fillStyle = on ? '#ffe14d' : '#3a3428';
+          ctx.fillRect(x, y + 8, TILE, 1);
+          // 上下也有導線時，畫成轉角
+          if ('-+*'.includes(map.get(tx, ty - 1))) { ctx.fillStyle = '#1c1f26'; ctx.fillRect(x + 5, y, 6, 8); }
+          if ('-+*'.includes(map.get(tx, ty + 1))) { ctx.fillStyle = '#1c1f26'; ctx.fillRect(x + 5, y + 8, 6, 8); }
+          continue;
+        }
+        if (c === '*') {
+          // 接頭：裸露的銅色端子，加上黃黑警示條紋
+          ctx.fillStyle = '#3a3428';
+          ctx.fillRect(x, y, TILE, TILE);
+          for (let k = -TILE; k < TILE; k += 6) {
+            ctx.fillStyle = '#e8c33a';
+            for (let t = 0; t < 3; t++) ctx.fillRect(Math.max(x, x + k + t), y + TILE - 3, 1, 3);
+          }
+          ctx.fillStyle = '#c98a46';
+          ctx.fillRect(x + 2, y + 2, TILE - 4, TILE - 6);
+          ctx.fillStyle = '#e6b070';
+          ctx.fillRect(x + 2, y + 2, TILE - 4, 1);
+          ctx.fillStyle = '#8a5a2a';
+          ctx.fillRect(x + 4, y + 5, 2, 4);
+          ctx.fillRect(x + 10, y + 5, 2, 4);
+          if (world.isPowered(tx, ty)) this.drawSpark(world, x, y, tx * 3 + ty);
+          continue;
+        }
         if (c === '+') {
-          // 金屬牆／導線：灰藍色的金屬板，中間一條銅線；有電時銅線變亮黃色
+          // 裸露金屬：灰藍色的金屬板、鉚釘、露出的銅線；有電時銅線變亮黃色並冒電弧
           ctx.fillStyle = '#4a5468';
           ctx.fillRect(x, y, TILE, TILE);
           ctx.fillStyle = '#6a7690';
@@ -35,6 +68,7 @@ export const TerrainRenderer = {
           ctx.fillRect(x + 7, y, 2, TILE);
           ctx.fillStyle = '#2f3644';
           for (const [bx, by] of [[2, 2], [13, 2], [2, 13], [13, 13]]) ctx.fillRect(x + bx, y + by, 1, 1);
+          if (world.isPowered(tx, ty)) this.drawSpark(world, x, y, tx * 5 + ty);
           continue;
         }
         if (c === '#') {
@@ -216,13 +250,28 @@ export const TerrainRenderer = {
     this.ctx.drawImage(spikeTile(pointDown), x, y);
   },
 
+  // 一小段閃爍的電弧（通電的裸露金屬、接頭、鐵塊）
+  drawSpark(world, x, y, seed) {
+    const t = Math.floor(world.time * 14 + seed);
+    if (t % 3) return;
+    const ctx = this.ctx;
+    ctx.fillStyle = '#fff6b0';
+    const sx = x + ((t * 7) % 10) + 2;
+    const sy = y + ((t * 5) % 8) - 3;
+    ctx.fillRect(sx, sy, 2, 1);
+    ctx.fillRect(sx + 1, sy + 1, 1, 2);
+    ctx.fillRect(sx + 1, sy + 3, 2, 1);
+  },
+
   // 通電的水格：黃色閃爍的電弧
   drawEnergized(world) {
     if (!world.energized) return;
     const ctx = this.ctx;
+    // 通電的鐵塊、金屬敵人：冒電弧
+    for (const m of world.energizedBodies ?? []) this.drawSpark(world, Math.round(m.x), Math.round(m.y), Math.round(m.x));
     ctx.fillStyle = '#ffe14d';
     for (let i = 0; i < world.energized.length; i++) {
-      if (!world.energized[i] || !world.energizedWater?.[i]) continue;
+      if (!world.energized[i] || world.conductor?.[i] !== 3) continue;
       const tx = i % COLS;
       const ty = (i / COLS) | 0;
       const t = Math.floor(world.time * 15 + tx * 7 + ty * 3);
@@ -232,6 +281,25 @@ export const TerrainRenderer = {
       ctx.fillRect(x, y, 3, 1);
       ctx.fillRect(x + 2, y + 1, 1, 2);
       ctx.fillRect(x + 2, y + 3, 3, 1);
+    }
+  },
+
+  // 通電場的預覽（按 / 打開提示時）：游標附近（通電場的範圍）會導電的格子和物體亮出淡淡的黃色外框
+  drawConductorPreview(world) {
+    if (!cfg.showHints || !world.loadout.includes('shock') || !world.conductorKinds) return;
+    const ctx = this.ctx;
+    const kind = world.conductorKinds();
+    const m = world.mouse;
+    const r = cfg.fieldRadius + 40;
+    ctx.strokeStyle = 'rgba(255,225,77,0.45)';
+    for (let ty = 0; ty < ROWS; ty++) for (let tx = 0; tx < COLS; tx++) {
+      if (!kind[ty * COLS + tx]) continue;
+      if (Math.hypot(tx * TILE + 8 - m.x, ty * TILE + 8 - m.y) > r) continue;
+      ctx.strokeRect(tx * TILE + 1.5, ty * TILE + 1.5, TILE - 3, TILE - 3);
+    }
+    for (const e of world.entities) {
+      if (!e.alive || !e.isMetal || Math.hypot(e.cx - m.x, e.cy - m.y) > r) continue;
+      ctx.strokeRect(Math.round(e.x) - 1.5, Math.round(e.y) - 1.5, e.w + 3, e.h + 3);
     }
   },
 

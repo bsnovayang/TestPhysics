@@ -56,6 +56,7 @@ export class Renderer {
     this.fx?.draw(this.ctx, world);
     this.drawPortals(world);
     this.drawEnergized(world);
+    this.drawConductorPreview(world);
     this.drawSwitchesAndDoors(world);
     this.drawJammerRanges(world);
     for (const e of world.entities) this.drawEntity(world, e);

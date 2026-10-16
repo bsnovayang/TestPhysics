@@ -27,7 +27,7 @@ export class TileMap {
 
   isSolid(tx, ty) {
     const c = this.get(tx, ty);
-    return c === '#' || c === '+' || c === 'I' || c === 'Q' || (c === 'D' && !this.doorOpen);
+    return c === '#' || c === '+' || c === '-' || c === '*' || c === 'I' || c === 'Q' || (c === 'D' && !this.doorOpen);
   }
 
   pointSolid(x, y) {

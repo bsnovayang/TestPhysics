@@ -29,7 +29,9 @@ export const LEGEND = {
   '|': { name: '移動平台的折返標記', tile: true },
   'I': { name: '冰牆格（會融化）', tile: true },
   'Z': { name: '熔岩', tile: true },
-  '+': { name: '金屬牆／導線（實心、導電；本身不會電人）', tile: true },
+  '+': { name: '裸露金屬（實心、導電；通電時碰到會被電）', tile: true },
+  '-': { name: '包覆導線（實心；只把電送給相連的導線、接頭、電器，不會電人，也不會傳給碰到它的東西）', tile: true },
+  '*': { name: '接頭（裸露的端子：和碰到的導體相連，例如鐵塊；通電時碰到會被電）', tile: true },
   'E': { name: '怪物通道（只有敵人能通過，玩家和箱子過不去）', tile: true },
 
   // 玩家與液體
@@ -64,8 +66,9 @@ export const LEGEND = {
   // 火爐嵌在牆裡，水不會從它的位置漏出去
   'H': { name: '點燃的火爐', entity: (tx, ty) => new Heater(tx, ty, true), replaceWith: '#' },
   'G': { name: '熄滅的火爐（空氣砲可以切換）', entity: (tx, ty) => new Heater(tx, ty, false), replaceWith: '#' },
-  'A': { name: '發電機（嵌在金屬牆裡，空氣砲可以開關）', entity: (tx, ty) => new Generator(tx, ty, true), replaceWith: '+' },
-  'q': { name: '電磁鐵（嵌在金屬牆裡，通電時吸引金屬）', entity: (tx, ty) => new Electromagnet(tx, ty), replaceWith: '+' },
+  'A': { name: '發電機（嵌在牆裡，空氣砲可以開關；和相鄰的導體相連）', entity: (tx, ty) => new Generator(tx, ty, true), replaceWith: '#' },
+  'a': { name: '發電機（一開始是關著的；空氣砲可以開關）', entity: (tx, ty) => new Generator(tx, ty, false), replaceWith: '#' },
+  'q': { name: '電磁鐵（嵌在牆裡，通電時吸引金屬；和相鄰的導體相連）', entity: (tx, ty) => new Electromagnet(tx, ty), replaceWith: '#' },
   '!': { name: '間歇噴發口', entity: (tx, ty) => new Vent(tx, ty) },
   '&': { name: '熔岩源', entity: (tx, ty) => new LiquidSource(tx, ty, 'lava', true) },
   '$': { name: '水源（空氣砲開關）', entity: (tx, ty) => new LiquidSource(tx, ty, 'water', false) },

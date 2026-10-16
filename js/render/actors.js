@@ -146,6 +146,17 @@ export const ActorRenderer = {
       ctx.fillRect(bx - 1, by - 1, 2, 2);
     }
 
+    // 靠近帶電的危險物（裸露金屬、接頭、帶電的水、通電的鐵塊）：頭上冒小火花警告
+    if ((p.nearShock || p.shocked) && Math.floor(world.time * 10) % 2) {
+      const hx = Math.round(p.cx);
+      const hy = Math.round(p.y) - 8;
+      ctx.fillStyle = p.shocked ? '#ffffff' : '#ffe14d';
+      ctx.fillRect(hx - 1, hy, 3, 1);
+      ctx.fillRect(hx, hy + 1, 1, 2);
+      ctx.fillRect(hx - 1, hy + 3, 3, 1);
+      ctx.fillRect(hx - 4, hy + 1, 1, 1);
+      ctx.fillRect(hx + 4, hy + 1, 1, 1);
+    }
     // 靜止回復中：身邊往上飄的藍色光點
     if (p.restBoost > 0) {
       ctx.fillStyle = '#9fd8ff';
