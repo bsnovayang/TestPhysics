@@ -124,15 +124,24 @@ export const EntityRenderer = {
       return;
     }
     if (e.isRope) {
-      // 繩子：棕色的細線；被燒時變紅、冒火星
+      // 繩子：從固定點拉到吊著的物體（只在最上面那一段畫整條）；被燒時變紅、冒火星
+      const rope = e.rope;
+      if (rope && rope.segs[0] !== e) return;
+      const a = rope ? rope.anchor : { x: e.cx, y: e.y };
+      const end = rope ? world.ropeEnd(rope) : { x: e.cx, y: e.y + e.h };
       const b = Math.min(1, e.burn);
-      ctx.fillStyle = b > 0 ? `rgb(${Math.round(140 + b * 115)},${Math.round(100 - b * 40)},${Math.round(60 - b * 30)})` : '#8a6435';
-      ctx.fillRect(Math.round(e.x), Math.round(e.y), 2, e.h);
-      ctx.fillStyle = '#5a4026';
-      for (let k = 2; k < e.h; k += 5) ctx.fillRect(Math.round(e.x), Math.round(e.y) + k, 2, 1);
-      if (b > 0 && Math.floor(world.time * 15 + e.ty) % 3 === 0) {
+      const len = Math.hypot(end.x - a.x, end.y - a.y);
+      const n = Math.max(1, Math.round(len / 2));
+      for (let k = 0; k < n; k++) {
+        const t = k / n;
+        const px = Math.round(a.x + (end.x - a.x) * t);
+        const py = Math.round(a.y + (end.y - a.y) * t);
+        ctx.fillStyle = k % 3 === 0 ? '#5a4026' : b > 0 ? `rgb(${Math.round(140 + b * 115)},${Math.round(100 - b * 40)},${Math.round(60 - b * 30)})` : '#8a6435';
+        ctx.fillRect(px - 1, py, 2, 2);
+      }
+      if (b > 0 && Math.floor(world.time * 15) % 3 === 0) {
         ctx.fillStyle = '#ffb347';
-        ctx.fillRect(Math.round(e.x) - 1, Math.round(e.y + e.h * (1 - b)), 4, 2);
+        ctx.fillRect(Math.round(a.x + (end.x - a.x) * (1 - b)) - 2, Math.round(a.y + (end.y - a.y) * (1 - b)), 4, 2);
       }
       return;
     }

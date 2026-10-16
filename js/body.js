@@ -63,7 +63,7 @@ export class Body {
   }
 
   applyGravity(ldt) {
-    if (this.held || this.railT > 0 || this.hanging) return; // 被抓住、電磁加速飛行中、被繩子吊著：不受重力
+    if (this.held || this.railT > 0) return; // 被抓住或電磁加速飛行中：不受重力
     this.vx += this.mods.gx * ldt;
     this.vy += this.mods.gy * ldt;
     this.applyDrag(ldt);
