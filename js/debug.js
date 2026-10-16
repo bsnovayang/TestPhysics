@@ -1,7 +1,7 @@
 import { cfg } from './config.js';
 
 // 即時參數面板。lil-gui 從 CDN 載入，離線時只會少了面板，遊戲照常執行。
-export async function createDebugPanel() {
+export async function createDebugPanel(gameWorld) {
   let GUI;
   try {
     ({ default: GUI } = await import('https://cdn.jsdelivr.net/npm/lil-gui@0.19.2/+esm'));
@@ -21,6 +21,14 @@ export async function createDebugPanel() {
       document.activeElement.blur();
     }
   }, true);
+
+  const cheats = gui.addFolder('測試（K 打游標下的敵人、J 魔王第二階段、I 無敵）');
+  cheats.add(cfg, 'godMode').name('玩家無敵').listen();
+  cheats.add({ phase2: () => gameWorld.debugBossPhase2() }, 'phase2').name('魔王直接進入第二階段');
+  cheats.add({ hit: () => {
+    const boss = gameWorld.entities.find((e) => e.isBoss && e.alive);
+    if (boss) boss.debugDamage(gameWorld, 3); else gameWorld.toast('這個房間沒有魔王');
+  } }, 'hit').name('魔王 -3 血');
 
   const world = gui.addFolder('世界');
   world.add(cfg, 'gravity', 100, 2000, 10).name('重力');

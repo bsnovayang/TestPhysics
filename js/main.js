@@ -135,6 +135,16 @@ input.onKey((code) => {
     case 'KeyG':
       cfg.showHitboxes = !cfg.showHitboxes;
       break;
+    case 'KeyK':
+      if (!world.debugHit(world.mouse.x, world.mouse.y, 3)) world.toast('游標下沒有敵人');
+      break;
+    case 'KeyJ':
+      world.debugBossPhase2();
+      break;
+    case 'KeyI':
+      cfg.godMode = !cfg.godMode;
+      world.toast(cfg.godMode ? '無敵：開' : '無敵：關');
+      break;
     case 'KeyM':
       slowMo = !slowMo;
       cfg.globalTimeScale = slowMo ? 0.25 : 1;
@@ -235,4 +245,4 @@ requestAnimationFrame(frame);
 
 let debugPanel = null;
 let debugVisible = false;
-createDebugPanel().then((gui) => { debugPanel = gui; });
+createDebugPanel(world).then((gui) => { debugPanel = gui; });

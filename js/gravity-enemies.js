@@ -421,6 +421,12 @@ export class GravityBoss extends Enemy {
     world.popup(this.cx, this.y, '無效', '#9aa7bd');
   }
 
+  // 除錯：直接扣血（無視護甲與每次上限），血量降到一半時照常進入第二階段
+  debugDamage(world, amount) {
+    this.hurt(world, amount);
+    if (this.alive && this.phase === 1 && this.hp <= this.maxHp / 2) this.enterPhase2(world);
+  }
+
   enterPhase2(world) {
     this.phase = 2;
     this.moveT = 1.5;

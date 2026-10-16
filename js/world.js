@@ -431,9 +431,26 @@ export class World {
     return { o, x, y, blocked: false, target: null };
   }
 
+  // 除錯：對某一點的敵人直接造成傷害（無視護甲與免疫）。回傳是否打到
+  debugHit(x, y, amount) {
+    const e = this.entities.find((e) => e.isEnemy && e.alive && x > e.x - 6 && x < e.x + e.w + 6 && y > e.y - 6 && y < e.y + e.h + 6);
+    if (!e) return false;
+    if (e.debugDamage) e.debugDamage(this, amount);
+    else e.hurt(this, amount);
+    return true;
+  }
+
+  // 除錯：魔王直接進入第二階段
+  debugBossPhase2() {
+    const boss = this.entities.find((e) => e.isBoss && e.alive);
+    if (!boss) { this.toast('這個房間沒有魔王'); return; }
+    if (boss.phase === 1) boss.debugDamage(this, boss.hp - Math.floor(boss.maxHp / 2));
+  }
+
   hurtPlayer(amount, { respawn = false, fromX = null } = {}) {
     const p = this.player;
     if (this.pendingRoom !== null) return;
+    if (cfg.godMode && !respawn) return;
     if (!respawn && p.invT > 0) return;
     p.hp -= amount;
     if (p.hp <= 0) {

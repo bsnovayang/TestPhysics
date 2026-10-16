@@ -119,6 +119,7 @@ export const cfg = {
 
   // 除錯
   globalTimeScale: 1,
+  godMode: false,        // 玩家無敵（尖刺、掉落仍會回到入口）
   showHitboxes: false,
 };
 
