@@ -46,8 +46,17 @@ export const ActorRenderer = {
       }
     }
 
+    // 自己人（被洗腦）：粉紅色外框，頭上一顆愛心，血量一直顯示
+    if (e.ally) {
+      ctx.strokeStyle = '#ff7ad9';
+      ctx.strokeRect(Math.round(e.x) - 2.5, Math.round(e.y) - 2.5, e.w + 5, e.h + 5);
+      const hx = Math.round(e.cx);
+      const hy = Math.round(e.y) - 10;
+      ctx.fillStyle = '#ff7ad9';
+      for (const [x, y, w] of [[-3, 0, 2], [1, 0, 2], [-3, 1, 6], [-2, 2, 4], [-1, 3, 2]]) ctx.fillRect(hx + x, hy + y, w, 1);
+    }
     // 血量
-    if (!e.armored && !e.isBoss && e.hp < e.maxHp) {
+    if ((e.ally || !e.armored) && !e.isBoss && e.hp < e.maxHp) {
       for (let i = 0; i < e.maxHp; i++) {
         ctx.fillStyle = i < e.hp ? '#ff6b6b' : '#444';
         ctx.fillRect(e.x + i * 4, e.y - 5, 3, 2);

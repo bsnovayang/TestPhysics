@@ -1,4 +1,4 @@
-import { cfg, VIEW_W, VIEW_H, SLOT_KEYS } from '../config.js';
+import { cfg, VIEW_W, VIEW_H, SLOT_KEYS, CHARM_LEVELS } from '../config.js';
 import { SKILLS, TREE_COLORS } from '../skills.js';
 import { TEXT, C } from './common.js';
 
@@ -74,6 +74,14 @@ export const HudRenderer = {
         ctx.fillStyle = '#ffd34d';
         ctx.textAlign = 'right';
         ctx.fillText(cd.toFixed(1), x + slotW - 3, y + 8);
+        ctx.textAlign = 'left';
+      }
+      // 洗腦：控制數量／上限
+      if (id === 'charm') {
+        const n = world.allies().length;
+        ctx.fillStyle = n ? '#ff7ad9' : C.dim;
+        ctx.textAlign = 'right';
+        ctx.fillText(`${n}/${CHARM_LEVELS[cfg.charmLevel] ?? 1}`, x + slotW - 3, y + 8);
         ctx.textAlign = 'left';
       }
       if (id === 'reflect' && world.reflect) {

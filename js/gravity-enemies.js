@@ -31,16 +31,18 @@ export class Presser extends Walker {
 
   think(world, ldt) {
     this.slamCd -= ldt;
-    const p = world.player;
+    const p = this.foe(world);
     if (this.grounded && this.groundAxis === 'y') {
       if (this.slamming) {
         this.slamming = false;
         this.slamCd = 2.2;
-        // 落地震波：站在地上、距離 4 格內的玩家受傷
+        // 落地震波：站在地上、距離 4 格內的對象受傷（敵人打玩家和自己人，自己人打敵人）
         world.burst(this.cx, this.groundSign > 0 ? this.y + this.h : this.y, '#c9b8ff', 18);
-        if (p.grounded && Math.abs(p.cx - this.cx) < 64 && Math.abs(p.cy - this.cy) < 32) world.hurtPlayer(1, { fromX: this.cx });
+        for (const v of this.victims(world)) {
+          if (v.grounded && Math.abs(v.cx - this.cx) < 64 && Math.abs(v.cy - this.cy) < 32) this.strike(world, v, 1);
+        }
       }
-      if (this.slamCd <= 0 && this.stunT <= 0 && Math.abs(p.cx - this.cx) < 72 && Math.abs(p.cy - this.cy) < 48) {
+      if (p && this.slamCd <= 0 && this.stunT <= 0 && Math.abs(p.cx - this.cx) < 72 && Math.abs(p.cy - this.cy) < 48) {
         this.vy = -this.groundSign * 300; // 低於撞擊門檻：正常重力下自己落地不會受傷
         this.vx = 0;
         this.slamming = true;
@@ -48,7 +50,7 @@ export class Presser extends Walker {
       }
     }
     if (this.slamming) return;
-    if (this.grounded) this.dir = Math.sign(p.cx - this.cx) || this.dir;
+    if (this.grounded && p && !this.ally) this.dir = Math.sign(p.cx - this.cx) || this.dir;
     super.think(world, ldt);
   }
 }
@@ -70,7 +72,7 @@ export class Balloon extends Enemy {
   }
 
   physics(world, ldt) {
-    const p = world.player;
+    const p = this.foe(world) ?? (this.ally ? this.allyGoal(world) : world.player);
     // 浮力固定往上（大小等於正常重力），所以實際受力 = 場域重力 - 正常重力
     const ax = this.mods.gx;
     let ay = this.mods.gy - cfg.gravity;
@@ -78,7 +80,7 @@ export class Balloon extends Enemy {
     if (this.stunT <= 0) {
       const want = (this.homeY - this.y) * 3 - this.vy * 2;
       ay += Math.max(-500, Math.min(500, want));
-      this.vx = approach(this.vx, (Math.sign(p.cx - this.cx) || 1) * 30, 60 * ldt);
+      this.vx = approach(this.vx, Math.abs(p.cx - this.cx) < 4 ? 0 : (Math.sign(p.cx - this.cx) || 1) * 30, 60 * ldt);
     }
     this.vx += ax * ldt;
     this.vy += ay * ldt;
@@ -89,10 +91,12 @@ export class Balloon extends Enemy {
 
   think(world, ldt) {
     this.dropT -= ldt;
-    const p = world.player;
-    if (this.dropT <= 0 && Math.abs(p.cx - this.cx) < 20 && p.cy > this.cy) {
+    const p = this.foe(world);
+    if (p && this.dropT <= 0 && Math.abs(p.cx - this.cx) < 20 && p.cy > this.cy) {
       this.dropT = 1.6;
-      world.entities.push(new Bullet(this.cx, this.y + this.h + 4, 0, 150));
+      const b = new Bullet(this.cx, this.y + this.h + 4, 0, 150);
+      b.friendly = this.ally;
+      world.entities.push(b);
     }
   }
 
@@ -138,14 +142,16 @@ export class CeilingWalker extends Walker {
   think(world, ldt) {
     super.think(world, ldt);
     this.throwT -= ldt;
-    const p = world.player;
-    if (this.throwT > 0 || this.stunT > 0 || !this.grounded || this.groundSign > 0) return;
+    const p = this.foe(world);
+    if (!p || this.throwT > 0 || this.stunT > 0 || !this.grounded || this.groundSign > 0) return;
     const dx = p.cx - this.cx;
     const dy = p.cy - this.cy;
     if (dy < 32 || Math.abs(dx) > dy * 0.8) return; // 只丟正下方附近
     this.throwT = 2;
     const d = Math.hypot(dx, dy);
-    world.entities.push(new Bullet(this.cx, this.y + this.h + 4, (dx / d) * 140, (dy / d) * 140));
+    const b = new Bullet(this.cx, this.y + this.h + 4, (dx / d) * 140, (dy / d) * 140);
+    b.friendly = this.ally;
+    world.entities.push(b);
   }
 }
 
@@ -168,12 +174,15 @@ export class ShieldSoldier extends Walker {
     this.fireT -= ldt;
     if (this.fireT > 0) return;
     this.fireT = 2.5;
-    const p = world.player;
+    const p = this.foe(world);
+    if (!p) return;
     const dx = p.cx - this.cx;
     const dy = p.cy - this.cy;
     const d = Math.hypot(dx, dy);
     if (d < 1 || d > 300) return;
-    world.entities.push(new Bullet(this.cx + (dx / d) * 10, this.cy + (dy / d) * 10, (dx / d) * 110, (dy / d) * 110));
+    const b = new Bullet(this.cx + (dx / d) * 10, this.cy + (dy / d) * 10, (dx / d) * 110, (dy / d) * 110);
+    b.friendly = this.ally;
+    world.entities.push(b);
   }
 }
 
@@ -192,7 +201,8 @@ export class BossMinion extends Heavy {
   }
 
   think(world, ldt) {
-    const p = world.player;
+    if (this.ally) { super.think(world, ldt); return; }
+    const p = this.foe(world);
     const dx = p.cx - this.cx;
     const sameLevel = Math.abs(p.cy - this.cy) < 24;
     // 不同層時，水平很近就不再轉向（否則會在玩家正上方的平台邊緣來回走、一直掉不下去）

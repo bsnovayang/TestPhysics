@@ -112,6 +112,21 @@ export const EffectRenderer = {
   },
 
   // 定向重力施放中：從起點到游標的方向箭頭
+  // 洗腦的指令位置：粉紅色的小旗子
+  drawAllyOrder(world) {
+    const o = world.allyOrder;
+    if (!o || !world.allies().length) return;
+    const ctx = this.ctx;
+    const x = Math.round(o.x);
+    const y = Math.round(o.y);
+    ctx.fillStyle = '#ff7ad9';
+    ctx.fillRect(x, y - 12, 1, 12);
+    ctx.fillRect(x + 1, y - 12, 6, 4);
+    ctx.globalAlpha = 0.4 + Math.sin(world.time * 6) * 0.3;
+    ctx.fillRect(x - 3, y, 7, 1);
+    ctx.globalAlpha = 1;
+  },
+
   drawDirAim(world) {
     const anchor = world.dirAimAnchor?.();
     if (!anchor) return;

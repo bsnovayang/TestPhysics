@@ -70,6 +70,7 @@ export class Renderer {
     this.drawDirAim(world);
     this.drawGrab(world);
     this.drawRewinds(world);
+    this.drawAllyOrder(world);
     this.drawPreview(world);
     if (cfg.showHitboxes) this.drawHitboxes(world);
     this.drawHud(world);

@@ -7,6 +7,7 @@ const PUSH_RATIO = 0.6;
 export class Player extends Body {
   constructor() {
     super(0, 0, 12, 28);
+    this.isPlayer = true;
     this.hp = cfg.hp;
     this.mp = cfg.mpMax;
     this.facing = 1;

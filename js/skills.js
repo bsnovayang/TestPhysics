@@ -9,6 +9,7 @@
 //   magnet       磁力場域：只吸引金屬物體（鐵塊、重裝兵、重壓兵），疊加在原本的重力上
 //   reflect      向量反射：按住維持，身邊的子彈、雷射、衝過來的物體被反彈（每次反射額外耗 MP，結束後有冷卻）
 //   railgun      電磁加速：把身邊的金屬物體朝游標方向高速射出（有冷卻）
+//   charm        洗腦：網打中敵人，它變成自己人（攻擊敵人、不攻擊玩家）；打中地面時命令自己人走過去待命
 //   rewind       時間倒轉：網打中的物體沿著過去 8 秒的路徑倒退回去（倒退中是實心的，可以站在上面被載回去）
 // drag：場域內的阻力（每秒衰減率），讓物體在反重力場域上緣穩定漂浮，而不是一直上下彈跳
 export const SKILLS = {
@@ -28,6 +29,7 @@ export const SKILLS = {
   rewind:   { name: '時間倒轉', tree: 'time',    type: 'rewind' },
   reflect:  { name: '向量反射', tree: 'vector',  type: 'reflect' },
   railgun:  { name: '電磁加速', tree: 'gravity', type: 'railgun' },
+  charm:    { name: '洗腦',     tree: 'mind',    type: 'charm' },
 };
 
 // 會展開場域的技能（可以附著）
@@ -37,11 +39,11 @@ export function isFieldSkill(skill) {
 }
 
 // 除錯用：數字鍵 1～9、0、-、=、、; 依序對應的技能
-export const SKILL_ORDER = ['lowG', 'zeroG', 'reverseG', 'dirG', 'pointG', 'slow', 'slow2', 'stop', 'haste', 'blink', 'portal', 'grab', 'magnet', 'rewind', 'reflect', 'railgun'];
-export const DEBUG_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus', 'Equal', 'Backslash', 'Semicolon', 'Quote', 'Comma'];
+export const SKILL_ORDER = ['lowG', 'zeroG', 'reverseG', 'dirG', 'pointG', 'slow', 'slow2', 'stop', 'haste', 'blink', 'portal', 'grab', 'magnet', 'rewind', 'reflect', 'railgun', 'charm'];
+export const DEBUG_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus', 'Equal', 'Backslash', 'Semicolon', 'Quote', 'Comma', 'Period'];
 // 按鍵代碼在畫面上顯示的文字
 export function keyLabel(code) {
-  return { Minus: '-', Equal: '=', Backslash: '\\', Semicolon: ';', Quote: "'", Comma: ',' }[code] ?? code.replace('Digit', '');
+  return { Minus: '-', Equal: '=', Backslash: '\\', Semicolon: ';', Quote: "'", Comma: ',', Period: '.' }[code] ?? code.replace('Digit', '');
 }
 
 export const DEFAULT_LOADOUT = ['lowG', 'reverseG', 'stop', 'portal', 'blink'];
@@ -51,4 +53,5 @@ export const TREE_COLORS = {
   time: '#4aa8ff',
   space: '#3ddc84',
   vector: '#ffb347', // 向量系（向量反射）
+  mind: '#ff7ad9',   // 精神系（洗腦）
 };

@@ -19,6 +19,46 @@ export class Enemy extends Body {
     this.laserCd = 0;           // 被雷射打到後的短暫冷卻
     this.density = 1.3;         // 一般敵人會沉入水中
     this.time = 1;
+    this.ally = false;          // 被洗腦，變成自己人
+    this.contactCd = 0;         // 和其他敵人（或自己人）互撞造成接觸傷害的冷卻
+  }
+
+  // 目前的對手：自己人找最近的敵人（下了移動指令時不找）；敵人找玩家或自己人中最近的
+  foe(world) {
+    if (this.ally) return world.allyOrder ? null : world.nearestHostile(this, cfg.allySight);
+    return world.nearestTarget(this);
+  }
+
+  // 攻擊對象：自己人打敵人（魔王除外）；敵人打玩家和自己人
+  victims(world) {
+    if (this.ally) return world.entities.filter((e) => e.isEnemy && e.alive && !e.ally && !e.isBoss);
+    return [world.player, ...world.allies()];
+  }
+
+  // 對某個對象造成傷害：玩家走受傷流程，其他直接扣血並擊退（有護甲的照樣不痛）
+  strike(world, target, amount) {
+    if (target === world.player) { world.hurtPlayer(amount, { fromX: this.cx }); return; }
+    target.takeDamage(world, amount, { x: Math.sign(target.cx - this.cx) || 1, y: -0.3 });
+  }
+
+  // 自己人沒有對手時：走到指令的位置，或跟著玩家
+  allyGoal(world) {
+    if (world.allyOrder) return { cx: world.allyOrder.x, cy: world.allyOrder.y, stop: 4 };
+    return { cx: world.player.cx, cy: world.player.cy, stop: 36 };
+  }
+
+  // 自己人的走路：朝對手或目標走，靠近就停
+  allyWalk(world, ldt) {
+    if (this.stunT > 0 || !this.grounded || this.groundAxis !== 'y') {
+      this.applyFriction(300 * ldt);
+      return;
+    }
+    const f = this.foe(world);
+    const goal = f ? { cx: f.cx, stop: 2 } : this.allyGoal(world);
+    const dx = goal.cx - this.cx;
+    if (Math.abs(dx) <= goal.stop) { this.applyFriction(600 * ldt); return; }
+    this.dir = Math.sign(dx);
+    this.vx = this.dir * this.speed;
   }
 
   update(world, dt) {
@@ -38,8 +78,14 @@ export class Enemy extends Body {
       this.die(world);
       return;
     }
-    if (world.overlap(this, world.player)) {
-      world.hurtPlayer(this.contactDamage, { fromX: this.cx });
+    // 接觸傷害：敵人撞到玩家或自己人、自己人撞到敵人
+    this.contactCd -= dt;
+    for (const v of this.victims(world)) {
+      if (!world.overlap(this, v)) continue;
+      if (v === world.player) { world.hurtPlayer(this.contactDamage, { fromX: this.cx }); continue; }
+      if (this.contactCd > 0) continue;
+      this.contactCd = 0.6;
+      this.strike(world, v, this.contactDamage);
     }
   }
 
@@ -81,7 +127,13 @@ export class Enemy extends Body {
     this.stunT = 0.3;
   }
 
+  // 打到自己人：只會推開，不會受傷
   onAirShot(world, dir) {
+    if (this.ally) {
+      this.vx += (dir.x * cfg.cannonImpulse) / this.mass;
+      this.vy += (dir.y * cfg.cannonImpulse) / this.mass;
+      return;
+    }
     this.takeDamage(world, cfg.cannonDamage, dir);
   }
 
@@ -110,6 +162,7 @@ export class Walker extends Enemy {
   }
 
   think(world, ldt) {
+    if (this.ally) { this.allyWalk(world, ldt); return; }
     if (this.stunT > 0 || !this.grounded || this.groundAxis !== 'y') {
       this.applyFriction(300 * ldt);
       return;
@@ -120,7 +173,7 @@ export class Walker extends Enemy {
 
   physics(world, ldt) {
     super.physics(world, ldt);
-    if (this.lastMove.bx && this.stunT <= 0) this.dir *= -1;
+    if (this.lastMove.bx && this.stunT <= 0 && !this.ally) this.dir *= -1;
   }
 }
 
@@ -159,19 +212,19 @@ export class LaserEnemy extends Walker {
   }
 
   think(world, ldt) {
-    const p = world.player;
+    const p = this.foe(world);
     this.timer += ldt;
     switch (this.state) {
       case 'patrol':
         super.think(world, ldt);
-        if (this.timer > cfg.laserCooldown && this.stunT <= 0 && this.canSee(world, p)) {
+        if (p && this.timer > cfg.laserCooldown && this.stunT <= 0 && this.canSee(world, p)) {
           this.state = 'charge';
           this.timer = 0;
         }
         return;
       case 'charge':
         this.applyFriction(600 * ldt);
-        if (this.timer < cfg.laserCharge - cfg.laserLock) this.aimAt(p);
+        if (p && this.timer < cfg.laserCharge - cfg.laserLock) this.aimAt(p);
         this.emit(world, 'telegraph');
         if (this.timer >= cfg.laserCharge) { this.state = 'fire'; this.timer = 0; }
         return;
@@ -192,7 +245,8 @@ export class LaserEnemy extends Walker {
 
   emit(world, kind) {
     const e = this.eye;
-    const beam = traceBeam(world, e.x + this.aim.x * 8, e.y + this.aim.y * 8, this.aim.x, this.aim.y, this);
+    // 自己人的雷射不會打到玩家
+    const beam = traceBeam(world, e.x + this.aim.x * 8, e.y + this.aim.y * 8, this.aim.x, this.aim.y, this, !this.ally);
     const locked = kind === 'telegraph' && this.timer >= cfg.laserCharge - cfg.laserLock;
     world.beams.push({ segments: beam.segments, kind: locked ? 'locked' : kind });
     return beam;
@@ -231,7 +285,9 @@ export class Jumper extends Enemy {
     if (this.stunT > 0) return;
     this.jumpT -= ldt;
     if (this.grounded && this.jumpT <= 0 && this.groundAxis === 'y') {
-      const dir = Math.sign(world.player.cx - this.cx) || 1;
+      const t = this.foe(world) ?? (this.ally ? this.allyGoal(world) : world.player);
+      if (this.ally && !this.foe(world) && Math.abs(t.cx - this.cx) < t.stop) return; // 自己人到了目標就不跳
+      const dir = Math.sign(t.cx - this.cx) || 1;
       this.vy = -this.groundSign * 270;
       this.vx = dir * 70;
       this.jumpT = 1.6;
@@ -253,7 +309,8 @@ export class Flyer extends Enemy {
     const ax = this.mods.gx;
     const ay = this.mods.gy - cfg.gravity;
     if (this.stunT <= 0) {
-      const target = (Math.sign(world.player.cx - this.cx) || 1) * 35;
+      const t = this.foe(world) ?? (this.ally ? this.allyGoal(world) : world.player);
+      const target = Math.abs(t.cx - this.cx) < 6 ? 0 : (Math.sign(t.cx - this.cx) || 1) * 35;
       this.vx = approach(this.vx, target, 120 * ldt);
       const wantY = this.homeY + Math.sin(this.phase) * 6;
       this.vy += ((wantY - this.y) * 4 - this.vy * 2) * ldt;
@@ -287,7 +344,8 @@ export class Turret extends Enemy {
     this.fireT -= ldt;
     if (this.fireT > 0) return;
     this.fireT = 1.8;
-    const p = world.player;
+    const p = this.foe(world);
+    if (!p) return;
     const dx = p.cx - this.cx;
     const dy = p.cy - this.cy;
     const d = Math.hypot(dx, dy);
@@ -296,6 +354,8 @@ export class Turret extends Enemy {
     for (let t = 10; t < d; t += 6) {
       if (world.map.pointSolid(this.cx + (dx / d) * t, this.cy + (dy / d) * t)) return;
     }
-    world.entities.push(new Bullet(this.cx + (dx / d) * 8, this.cy + (dy / d) * 8, (dx / d) * 120, (dy / d) * 120));
+    const b = new Bullet(this.cx + (dx / d) * 8, this.cy + (dy / d) * 8, (dx / d) * 120, (dy / d) * 120);
+    b.friendly = this.ally;
+    world.entities.push(b);
   }
 }

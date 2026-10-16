@@ -15,6 +15,7 @@ import { ReflectAbility } from './abilities/reflect.js';
 import { RailgunAbility } from './abilities/railgun.js';
 import { RewindAbility } from './abilities/rewind.js';
 import { BlinkAbility } from './abilities/blink.js';
+import { CharmAbility } from './abilities/charm.js';
 import { makeRng } from './rng.js';
 
 function parseRoom(def) {
@@ -97,6 +98,7 @@ export class World {
     this.dirAim = null;
     this.grab = null;
     this.reflect = null;
+    this.allyOrder = null;
     this.cooldowns = {};
     this.bolts = [];
     if (this.room.loadout) this.loadout = [...this.room.loadout]; // 測試房間可以指定裝備
@@ -252,6 +254,12 @@ export class World {
       this.reflect = { key: keyCode, flash: 0 };
       this.burst(p.cx, p.cy, '#ffb347', 12);
       return;
+    }
+    // 洗腦：游標不在敵人身上時是下指令（自己人走到游標的位置待命），不發射網、不耗 MP
+    if (skill.type === 'charm') {
+      const m = this.mouse;
+      const onEnemy = this.entities.some((e) => e.isEnemy && e.alive && m.x > e.x - 4 && m.x < e.x + e.w + 4 && m.y > e.y - 4 && m.y < e.y + e.h + 4);
+      if (!onEnemy) { this.commandAllies(m.x, m.y); return; }
     }
     if (skill.type === 'railgun') {
       if (p.mp < cfg.railCost) { this.toast('MP 不足'); return; }
@@ -433,7 +441,7 @@ export class World {
     this.portals.jammers = jammers;
     // 敵人自帶的重力盾
     this.fields.innate = this.entities.filter((e) => e.shieldR && e.alive)
-      .map((e) => ({ x: e.cx, y: e.cy, r: e.shieldR, value: e.shieldValue, owner: e }));
+      .map((e) => ({ x: e.cx, y: e.cy, r: e.shieldR, value: e.shieldValue, owner: e, ally: e.ally }));
     // 光線每幀重新計算：先清掉上一幀的光線與接收器狀態
     this.beams = [];
     for (const s of this.switches) s.lit = false;
@@ -445,6 +453,7 @@ export class World {
     this.updateChannels(dt);
     this.updateDirAim();
     this.updateReflect(dt);
+    this.updateCharm(dt);
     this.reflectLaser = false; // 這一幀的雷射重新計算時才設定
 
     if (this.pendingRoom === null) {
@@ -529,7 +538,7 @@ export class World {
     const open = this.hasBoss
       ? !this.entities.some((e) => e.isBoss && e.alive)
       : this.room.openWhen === 'enemies'
-        ? !this.entities.some((e) => e.isEnemy && e.alive)
+        ? !this.entities.some((e) => e.isEnemy && e.alive && !e.ally)
         : this.switches.length > 0 && this.switches.every((s) => s.pressed);
     if (open === this.map.doorOpen) return;
     if (!open) {
@@ -545,4 +554,4 @@ export class World {
 }
 
 // 各種能力的邏輯放在 js/abilities/，掛到 World 上
-Object.assign(World.prototype, DirAimAbility, GrabAbility, ReflectAbility, RailgunAbility, RewindAbility, BlinkAbility);
+Object.assign(World.prototype, DirAimAbility, GrabAbility, ReflectAbility, RailgunAbility, RewindAbility, BlinkAbility, CharmAbility);

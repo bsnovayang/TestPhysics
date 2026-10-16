@@ -37,7 +37,8 @@ export class FieldSystem {
 
   // 重力盾往外推的加速度。點上有重力盾時，連同同一點的所有點重力一起加總，
   // 所以玩家在盾上放一個點重力（吸引）就能把盾抵消。shield：只算盾本身的推力大小
-  shieldPush(x, y) {
+  // opts.skipAlly：忽略自己人的盾（玩家的網和空氣砲）；opts.onlyAlly：只看自己人的盾（敵人的子彈）
+  shieldPush(x, y, opts = {}) {
     const G = cfg.gravity;
     let px = 0;
     let py = 0;
@@ -52,6 +53,7 @@ export class FieldSystem {
       py += dy * k;
     };
     for (const s of this.innate) {
+      if ((opts.skipAlly && s.ally) || (opts.onlyAlly && !s.ally)) continue;
       if (Math.hypot(x - s.x, y - s.y) > s.r || this.jammedAt(x, y, 'gravity')) continue;
       inShield = true;
       add(s.x, s.y, s.value);
@@ -203,6 +205,7 @@ export class FieldSystem {
     // 重力盾：往外推，疊加在上面
     for (const sh of this.innate) {
       if (sh.owner === self) continue;
+      if (sh.ally && self?.isPlayer) continue; // 自己人的盾不推玩家
       const dx = sh.x - x; // 和點重力相同的算法：value 為負時往外推
       const dy = sh.y - y;
       const d = Math.hypot(dx, dy);

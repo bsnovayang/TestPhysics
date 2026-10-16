@@ -68,6 +68,11 @@ export const cfg = {
   railCost: 25,          // 每次消耗的 MP
   railCd: 2,             // 冷卻秒數
 
+  // 洗腦
+  charmLevel: 1,         // 洗腦的等級（1～3）：同時控制的數量上限見 CHARM_LEVELS
+  charmDrain: 6,         // 每控制一隻，每秒消耗的 MP
+  allySight: 260,        // 自己人會去攻擊多遠以內的敵人
+
   // 空間
   blinkRange: 80,            // 約 5 格
   blinkThroughWalls: false,  // 之後解鎖
@@ -156,6 +161,9 @@ export const GRAB_LEVELS = {
   2: { range: 80, maxMass: 2, carry: false },
   3: { range: 160, maxMass: 3, carry: false },
 };
+
+// 洗腦的等級：同時控制的數量上限
+export const CHARM_LEVELS = { 1: 1, 2: 2, 3: 3 };
 
 // 技能欄對應的按鍵（POE 式快捷鍵）
 export const SLOT_KEYS = [

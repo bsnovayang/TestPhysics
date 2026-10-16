@@ -10,7 +10,7 @@ const SHIELD_MIN_RATIO = 0.5;
 // 回傳反射後的單位方向；不用反射時回傳 null。started：這發是不是在盾裡面發射的
 function bounceByShield(world, x, y, dx, dy, startedInside) {
   if (startedInside) return null;
-  const push = world.fields.shieldPush(x, y);
+  const push = world.fields.shieldPush(x, y, { skipAlly: true }); // 自己人的盾不擋玩家的網和空氣砲
   if (!push) return null;
   const m = Math.hypot(push.x, push.y);
   if (m < push.shield * SHIELD_MIN_RATIO) return null;
@@ -48,7 +48,7 @@ export class Web {
       if (dist < 0.001) return this.arrive(world);
       const step = Math.min(WEB_STEP, remaining, dist);
       // 被重力盾彈開：方向改變，剩下的距離不變
-      if (this.startedInside === undefined) this.startedInside = !!world.fields.shieldPush(this.x, this.y);
+      if (this.startedInside === undefined) this.startedInside = !!world.fields.shieldPush(this.x, this.y, { skipAlly: true });
       const bent = bounceByShield(world, this.x, this.y, dx / dist, dy / dist, this.startedInside);
       if (bent) {
         this.tx = this.x + bent.x * dist;
@@ -105,6 +105,13 @@ export class Web {
   }
 
   expand(world, target = null) {
+    // 洗腦：打中敵人就控制它；打中地面（或自己人以外的地方）就命令自己人走過去
+    if (SKILLS[this.skillId].type === 'charm') {
+      if (target?.isEnemy) world.charm(target);
+      else world.commandAllies(this.x, this.y);
+      this.alive = false;
+      return;
+    }
     // 時間倒轉：一定要打中物體
     if (SKILLS[this.skillId].type === 'rewind') {
       if (!target) return this.fail(world, '時間倒轉要瞄準物體');
@@ -139,7 +146,7 @@ export class AirShot {
     const dist = cfg.cannonSpeed * dt * tm;
     const steps = Math.max(1, Math.ceil(dist / 4));
     for (let i = 0; i < steps; i++) {
-      if (this.startedInside === undefined) this.startedInside = !!world.fields.shieldPush(this.x, this.y);
+      if (this.startedInside === undefined) this.startedInside = !!world.fields.shieldPush(this.x, this.y, { skipAlly: true });
       const bent = bounceByShield(world, this.x, this.y, this.dx, this.dy, this.startedInside);
       if (bent) { this.dx = bent.x; this.dy = bent.y; }
       const nx = this.x + (this.dx * dist) / steps;
@@ -212,13 +219,29 @@ export class Bullet {
     }
     if (this.solid) return;
     if (this.friendly) {
-      const enemy = world.entities.find((e) => e.isEnemy && e.alive && world.overlap(this, e));
+      const enemy = world.entities.find((e) => e.isEnemy && e.alive && !e.ally && world.overlap(this, e));
       if (enemy) {
         enemy.takeDamage(world, 2, { x: Math.sign(this.vx), y: Math.sign(this.vy) });
         this.alive = false;
       }
-    } else if (world.overlap(this, world.player)) {
+      return;
+    }
+    // 敵人的子彈：自己人的重力盾會把它彈開
+    const push = world.fields.shieldPush(this.cx, this.cy, { onlyAlly: true });
+    if (push) {
+      const m = Math.hypot(push.x, push.y) || 1;
+      const dot = (this.vx * push.x + this.vy * push.y) / m;
+      if (dot < 0) { this.vx -= (2 * dot * push.x) / m; this.vy -= (2 * dot * push.y) / m; }
+    }
+    if (world.overlap(this, world.player)) {
       world.hurtPlayer(1, { fromX: this.cx });
+      this.alive = false;
+      return;
+    }
+    // 也會打到自己人
+    const ally = world.entities.find((e) => e.ally && e.alive && world.overlap(this, e));
+    if (ally) {
+      ally.takeDamage(world, 1, { x: Math.sign(this.vx), y: Math.sign(this.vy) });
       this.alive = false;
     }
   }

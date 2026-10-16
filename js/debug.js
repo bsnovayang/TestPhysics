@@ -25,6 +25,7 @@ export async function createDebugPanel(gameWorld) {
   const cheats = gui.addFolder('測試（K 打游標下的敵人、J 魔王第二階段、I 無敵）');
   cheats.add(cfg, 'godMode').name('玩家無敵').listen();
   cheats.add(cfg, 'grabLevel', [1, 2, 3]).name('重力抓取等級');
+  cheats.add(cfg, 'charmLevel', [1, 2, 3]).name('洗腦等級（同時控制數量）');
   cheats.add({ phase2: () => gameWorld.debugBossPhase2() }, 'phase2').name('魔王直接進入第二階段');
   cheats.add({ hit: () => {
     const boss = gameWorld.entities.find((e) => e.isBoss && e.alive);
