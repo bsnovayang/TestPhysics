@@ -21,6 +21,7 @@ export class Presser extends Walker {
     this.maxHp = 4;
     this.mass = 8;
     this.density = 3;
+    this.isMetal = true;
     this.speed = 26;
     this.armored = true;
     this.color = '#7a6a9a';

@@ -44,6 +44,14 @@ export const cfg = {
   selfAttachUnlocked: true, // 之後隨進度解鎖；原型預設開啟
   selfDrain: 25,            // 每秒消耗的 MP（啟動時另外扣一次一般消耗）
 
+  // 重力抓取與時間倒轉
+  grabRange: 160,        // 抓取的距離（和網的射程相同）
+  grabMaxMass: 3,        // 抓得起來的最大質量：木箱 1、鐵塊 2 可以；重裝兵 5、重壓兵 8 太重
+  grabDrain: 15,         // 抓住時每秒消耗的 MP
+  grabSpeed: 420,        // 被抓住的物體追向游標的最高速度（放開時保留，所以可以丟出去）
+  rewindTime: 5,         // 時間倒轉最多倒回幾秒
+  rewindSpeed: 2,        // 倒轉播放的速度（倍）
+
   // 空間
   blinkRange: 80,            // 約 5 格
   blinkThroughWalls: false,  // 之後解鎖
@@ -109,6 +117,7 @@ export const cfg = {
   impactThreshold: 320,  // px/s，約等於從 3.6 格高掉下來；要高於跳躍兵的起跳速度（270），否則它落地會自傷
   impactPerDamage: 50,   // 超過門檻每多少 px/s 算 1 點傷害
   impactRestitution: 0.3,
+  stasisImpact: 200,     // 被時停的物體被撞的速度超過這個值，撞擊的力也會累積起來（時停結束時一次釋放）
   ironBreak: 400,        // 鐵塊撞牆或地面的速度超過這個值就碎掉（撞到敵人造成傷害時一定碎）
 
   // 物件

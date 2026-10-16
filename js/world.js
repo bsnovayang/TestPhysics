@@ -1,4 +1,4 @@
-import { cfg, COLS, ROWS } from './config.js';
+import { cfg, COLS, ROWS, STEP } from './config.js';
 import { TileMap } from './tilemap.js';
 import { Field, FieldSystem } from './fields.js';
 import { SKILLS, DEFAULT_LOADOUT, isFieldSkill } from './skills.js';
@@ -133,6 +133,8 @@ export class World {
     this.projectiles = [];
     this.fields.clear();
     this.dirAim = null;
+    this.grab = null;
+    if (this.room.loadout) this.loadout = [...this.room.loadout]; // 測試房間可以指定裝備
     this.fields.base = { x: 0, y: 1 }; // 重力魔王轉過的重力，換房間或重來時恢復向下
     this.hasBoss = this.entities.some((e) => e.isBoss);
     this.portals.clear();
@@ -274,6 +276,11 @@ export class World {
       this.toast('MP 不足');
       return;
     }
+    // 重力抓取：先確認游標下有抓得起來的東西，沒有就不扣 MP
+    if (skill.type === 'grab') {
+      if (this.startGrab(keyCode)) p.mp -= cost;
+      return;
+    }
     p.mp -= cost;
 
     if (skill.self) {
@@ -329,6 +336,111 @@ export class World {
       if (a.web.field) a.web.field.dir = dir;
     }
     if (!this.input.isDown(a.key)) this.dirAim = null;
+  }
+
+  // 重力抓取：抓住游標下的物體（箱子、鐵塊、輕的敵人）。回傳是否成功
+  startGrab(keyCode) {
+    const p = this.player;
+    const o = p.shoulder();
+    const t = this.entities.find((e) => e.isBody && e.alive && !e.isBoss
+      && this.mouse.x > e.x - 4 && this.mouse.x < e.x + e.w + 4 && this.mouse.y > e.y - 4 && this.mouse.y < e.y + e.h + 4);
+    if (!t) { this.toast('游標下沒有可以抓的東西'); return false; }
+    if (Math.hypot(t.cx - o.x, t.cy - o.y) > cfg.grabRange) { this.toast('太遠了'); return false; }
+    if (t.mass > cfg.grabMaxMass) { this.toast('太重了，抓不起來'); return false; }
+    if (t === p.groundBody) { this.toast('不能抓自己腳下的東西'); return false; }
+    if (this.fields.jammedAt(t.cx, t.cy, 'gravity')) { this.toast('重力被干擾，抓不起來'); return false; }
+    // 中間不能被牆擋住
+    const d = Math.hypot(t.cx - o.x, t.cy - o.y);
+    for (let k = 8; k < d; k += 4) {
+      const x = o.x + ((t.cx - o.x) / d) * k;
+      const y = o.y + ((t.cy - o.y) / d) * k;
+      // 碰到目標外圍 4 px 就算看得到（放在平台上的箱子，視線常會擦過平台邊角）
+      if (x > t.x - 4 && x < t.x + t.w + 4 && y > t.y - 4 && y < t.y + t.h + 4) break;
+      if (this.map.pointSolid(x, y)) { this.toast('被牆擋住了'); return false; }
+    }
+    this.grab = { target: t, key: keyCode };
+    t.held = true;
+    this.burst(t.cx, t.cy, '#c9a8ff', 10);
+    return true;
+  }
+
+  endGrab(message) {
+    if (!this.grab) return;
+    this.grab.target.held = false;
+    this.grab = null;
+    if (message) this.toast(message);
+  }
+
+  // 被抓住的物體追向游標（限制在抓取距離內），速度有上限；放開按鍵時保留當下的速度，所以可以丟出去
+  updateGrab(dt) {
+    const g = this.grab;
+    if (!g) return;
+    const p = this.player;
+    const t = g.target;
+    if (!t.alive) return this.endGrab();
+    if (!this.input.isDown(g.key)) return this.endGrab();
+    if (t === p.groundBody) return this.endGrab('不能抓自己腳下的東西');
+    if (this.fields.jammedAt(t.cx, t.cy, 'gravity')) return this.endGrab('重力被干擾，放開了');
+    p.mp -= cfg.grabDrain * dt;
+    if (p.mp <= 0) { p.mp = 0; return this.endGrab('MP 耗盡'); }
+    const o = p.shoulder();
+    let tx = this.mouse.x;
+    let ty = this.mouse.y;
+    const d = Math.hypot(tx - o.x, ty - o.y);
+    if (d > cfg.grabRange) { tx = o.x + ((tx - o.x) / d) * cfg.grabRange; ty = o.y + ((ty - o.y) / d) * cfg.grabRange; }
+    let vx = (tx - t.cx) * 10;
+    let vy = (ty - t.cy) * 10;
+    const v = Math.hypot(vx, vy);
+    if (v > cfg.grabSpeed) { vx *= cfg.grabSpeed / v; vy *= cfg.grabSpeed / v; }
+    t.vx = vx;
+    t.vy = vy;
+    if (t.isEnemy) t.stunT = Math.max(t.stunT, 0.2); // 被抓住的敵人不能行動
+  }
+
+  // 時間倒轉：物體沿著過去的路徑倒退回去。由網打中物體時呼叫
+  startRewind(target) {
+    if (this.fields.jammedAt(target.cx, target.cy, 'time')) { this.toast('時間被干擾，無法倒轉'); this.refundSkill(); return; }
+    const h = target.hist ?? [];
+    const moved = h.some((q) => Math.abs(q.x - target.x) > 4 || Math.abs(q.y - target.y) > 4);
+    if (!moved) { this.toast('它最近沒有移動過'); this.refundSkill(); return; }
+    if (this.grab?.target === target) this.endGrab();
+    target.rewind = { frames: target.hist.slice().reverse(), i: 0 };
+    target.hist = [];
+    target.vx = 0;
+    target.vy = 0;
+    this.burst(target.cx, target.cy, '#9fd8ff', 14);
+  }
+
+  // 每幀記錄物體的位置（最多 rewindTime 秒），倒轉時拿來播放
+  recordHistory() {
+    const max = Math.round(cfg.rewindTime / STEP);
+    for (const e of this.entities) {
+      if (!e.isBody || !e.alive || e.rewind || e.isBoss) continue;
+      (e.hist ??= []).push({ x: e.x, y: e.y });
+      if (e.hist.length > max) e.hist.shift();
+    }
+  }
+
+  // 倒轉中的物體：照著記錄倒著走（實心，站在上面的東西會被載著走）
+  stepRewinds() {
+    for (const e of this.entities) {
+      const r = e.rewind;
+      if (!r || !e.alive) continue;
+      r.i = Math.min(r.frames.length - 1, r.i + cfg.rewindSpeed);
+      const to = r.frames[Math.floor(r.i)];
+      const dx = to.x - e.x;
+      const dy = to.y - e.y;
+      const riders = this.bodies().filter((b) => b !== e && !b.rewind && Math.abs(b.y + b.h - e.y) < 1.5 && b.x < e.x + e.w && b.x + b.w > e.x);
+      // 往上時先移動站在上面的東西，往下時先移動自己，避免互相卡住
+      if (dy < 0) for (const b of riders) b.moveAxis(this, 'y', dy);
+      e.x = to.x;
+      e.y = to.y;
+      if (dy >= 0) for (const b of riders) b.moveAxis(this, 'y', dy);
+      for (const b of riders) b.moveAxis(this, 'x', dx);
+      e.vx = 0;
+      e.vy = 0;
+      if (r.i >= r.frames.length - 1) e.rewind = null;
+    }
   }
 
   // 閃現：朝游標瞬間移動，保留原本的速度。不能穿牆時，停在路徑上最後一個空位
@@ -509,11 +621,14 @@ export class World {
     this.updateDirAim();
 
     if (this.pendingRoom === null) {
-      for (const e of this.entities) if (e.alive) e.update(this, dt);
+      this.updateGrab(dt);
+      this.stepRewinds();
+      for (const e of this.entities) if (e.alive && !e.rewind) e.update(this, dt);
       for (const p of this.projectiles) if (p.alive) p.update(this, dt);
       for (const b of this.portalTravelers()) this.portals.tryTeleport(this, b);
       this.resolveImpacts();
       this.updateSwitches();
+      this.recordHistory();
     }
 
     this.fields.followTargets();

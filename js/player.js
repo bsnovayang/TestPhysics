@@ -135,7 +135,7 @@ export class Player extends Body {
     this.invT -= dt;
     this.hasteT -= dt;
     this.cannonCd -= dt;
-    if (!world.fields.channeling) this.mp = Math.min(cfg.mpMax, this.mp + cfg.mpRegen * dt);
+    if (!world.fields.channeling && !world.grab) this.mp = Math.min(cfg.mpMax, this.mp + cfg.mpRegen * dt);
 
     this.handleActions(world);
     this.checkHazards(world);

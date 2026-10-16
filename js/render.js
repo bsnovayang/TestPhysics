@@ -91,6 +91,8 @@ export class Renderer {
     this.drawFieldOutlines(world);
     this.drawStasisArrows(world);
     this.drawDirAim(world);
+    this.drawGrab(world);
+    this.drawRewinds(world);
     this.drawPreview(world);
     if (cfg.showHitboxes) this.drawHitboxes(world);
     this.drawHud(world);
@@ -986,13 +988,19 @@ export class Renderer {
     ctx.globalAlpha = 1;
   }
 
+  // 畫出來的場域半徑：附著的時停只凍結目標本身，所以只畫一個貼著目標的小圈
+  fieldDrawR(f) {
+    if (f.target && f.skill.type === 'timeMult' && f.skill.value === 0) return Math.hypot(f.target.w, f.target.h) / 2 + 3;
+    return f.r;
+  }
+
   drawFieldFills(world) {
     const ctx = this.ctx;
     for (const f of world.fields.list) {
       ctx.globalAlpha = 0.16;
       ctx.fillStyle = TREE_COLORS[f.skill.tree];
       ctx.beginPath();
-      ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
+      ctx.arc(f.x, f.y, this.fieldDrawR(f), 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.globalAlpha = 1;
@@ -1006,8 +1014,9 @@ export class Renderer {
       ctx.globalAlpha = 0.5;
       // 附著的場域用虛線外框，和固定在原地的場域區分
       if (f.target) ctx.setLineDash([3, 3]);
+      const r = this.fieldDrawR(f);
       ctx.beginPath();
-      ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
+      ctx.arc(f.x, f.y, r, 0, Math.PI * 2);
       ctx.stroke();
       ctx.setLineDash([]);
       // 剩餘時間；維持型場域沒有時間限制，改用閃爍的完整外圈表示
@@ -1015,15 +1024,15 @@ export class Renderer {
       ctx.beginPath();
       if (f.channel) {
         ctx.globalAlpha = 0.6 + Math.sin(world.time * 12) * 0.3;
-        ctx.arc(f.x, f.y, f.r + 2, 0, Math.PI * 2);
+        ctx.arc(f.x, f.y, r + 2, 0, Math.PI * 2);
       } else {
         ctx.globalAlpha = 0.95;
-        ctx.arc(f.x, f.y, f.r + 2, -Math.PI / 2, -Math.PI / 2 + (f.life / f.maxLife) * Math.PI * 2);
+        ctx.arc(f.x, f.y, r + 2, -Math.PI / 2, -Math.PI / 2 + (f.life / f.maxLife) * Math.PI * 2);
       }
       ctx.stroke();
       ctx.lineWidth = 1;
       ctx.globalAlpha = 1;
-      this.drawFieldIcon(f, color);
+      if (r === f.r) this.drawFieldIcon(f, color);
     }
   }
 
@@ -1047,6 +1056,19 @@ export class Renderer {
         const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
         this.drawArrow(f.x + Math.cos(a) * 14, f.y + Math.sin(a) * 14, -Math.cos(a), -Math.sin(a), 6);
       }
+    } else if (s.type === 'magnet') {
+      // 馬蹄形磁鐵
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(f.x, f.y - 1, 5, Math.PI, 0);
+      ctx.moveTo(f.x - 5, f.y - 1); ctx.lineTo(f.x - 5, f.y + 5);
+      ctx.moveTo(f.x + 5, f.y - 1); ctx.lineTo(f.x + 5, f.y + 5);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(f.x - 6, f.y + 4, 3, 2);
+      ctx.fillRect(f.x + 4, f.y + 4, 3, 2);
+      ctx.fillStyle = color;
     } else if (s.type === 'timeMult') {
       ctx.beginPath();
       ctx.arc(f.x, f.y, 6, 0, Math.PI * 2);
@@ -1103,6 +1125,39 @@ export class Renderer {
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(Math.round(e.cx + ux * len) - 1, Math.round(e.cy + uy * len) - 1, 3, 3);
       }
+    }
+  }
+
+  // 重力抓取：從肩膀到被抓的物體一串紫色光點，物體外圍一圈
+  drawGrab(world) {
+    const g = world.grab;
+    if (!g) return;
+    const ctx = this.ctx;
+    const o = world.player.shoulder();
+    const t = g.target;
+    const d = Math.hypot(t.cx - o.x, t.cy - o.y);
+    ctx.fillStyle = '#c9a8ff';
+    for (let k = 6; k < d; k += 6) {
+      const wob = Math.sin(world.time * 20 + k * 0.3) * 1.5;
+      ctx.fillRect(Math.round(o.x + ((t.cx - o.x) / d) * k + wob) - 1, Math.round(o.y + ((t.cy - o.y) / d) * k) - 1, 2, 2);
+    }
+    ctx.strokeStyle = '#c9a8ff';
+    ctx.strokeRect(Math.round(t.x) - 2.5, Math.round(t.y) - 2.5, t.w + 5, t.h + 5);
+  }
+
+  // 時間倒轉中：剩下要走的路徑畫成淡藍色的點，物體本身染成藍色
+  drawRewinds(world) {
+    const ctx = this.ctx;
+    for (const e of world.entities) {
+      const r = e.rewind;
+      if (!r || !e.alive) continue;
+      ctx.fillStyle = 'rgba(159,216,255,0.7)';
+      for (let k = Math.ceil(r.i); k < r.frames.length; k += 6) {
+        const p = r.frames[k];
+        ctx.fillRect(Math.round(p.x + e.w / 2) - 1, Math.round(p.y + e.h / 2) - 1, 2, 2);
+      }
+      ctx.fillStyle = 'rgba(74,168,255,0.35)';
+      ctx.fillRect(Math.round(e.x), Math.round(e.y), e.w, e.h);
     }
   }
 
@@ -1249,6 +1304,9 @@ export class Renderer {
       color = '#ffd34d';
     } else if (world.dirAim) {
       text = '移動游標決定方向，放開確定';
+      color = '#d0b0ff';
+    } else if (world.grab) {
+      text = '移動游標搬運，放開丟出';
       color = '#d0b0ff';
     } else if (world.isSelfCast()) {
       if (cfg.selfAttachUnlocked) {

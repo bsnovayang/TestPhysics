@@ -209,6 +209,7 @@ export class Heavy extends Walker {
     this.y = (ty + 1) * TILE - this.h;
     this.mass = 5;
     this.density = 3;
+    this.isMetal = true; // 磁力吸得到
     this.speed = 22;
     this.armored = true;
     this.impactImmune = true;

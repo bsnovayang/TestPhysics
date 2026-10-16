@@ -2,7 +2,7 @@ import { cfg, STEP, SLOT_KEYS } from './config.js';
 import { Input } from './input.js';
 import { World } from './world.js';
 import { Renderer } from './render.js';
-import { SKILLS, SKILL_ORDER, DEBUG_KEYS, TREE_COLORS } from './skills.js';
+import { SKILLS, SKILL_ORDER, DEBUG_KEYS, TREE_COLORS, keyLabel } from './skills.js';
 import { createDebugPanel } from './debug.js';
 import { ROOMS } from './rooms.js';
 
@@ -82,7 +82,7 @@ function buildLoadout() {
     const btn = document.createElement('button');
     btn.className = 'skill';
     btn.style.borderLeftColor = TREE_COLORS[sk.tree];
-    btn.innerHTML = `<small>${DEBUG_KEYS[i].replace('Digit', '').replace('Minus', '-')}</small>${sk.name}`;
+    btn.innerHTML = `<small>${keyLabel(DEBUG_KEYS[i])}</small>${sk.name}`;
     btn.onclick = () => { world.loadout[selectedSlot] = id; buildLoadout(); };
     skillsEl.appendChild(btn);
   });

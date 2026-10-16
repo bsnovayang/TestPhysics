@@ -56,6 +56,7 @@ export class Body {
   }
 
   applyGravity(ldt) {
+    if (this.held) return; // 被重力抓取抓住時，由抓取決定速度
     this.vx += this.mods.gx * ldt;
     this.vy += this.mods.gy * ldt;
     this.applyDrag(ldt);
@@ -134,15 +135,23 @@ export class Body {
   moveByVelocity(world, ldt) {
     const bx = this.moveAxis(world, 'x', this.vx * ldt);
     if (bx) {
+      this.pushFrozen(bx, 'vx');
       this.onImpact?.(world, Math.abs(this.vx));
       this.vx = 0;
     }
     const by = this.moveAxis(world, 'y', this.vy * ldt);
     if (by) {
+      this.pushFrozen(by, 'vy');
       this.onImpact?.(world, Math.abs(this.vy));
       this.vy = 0;
     }
     return { bx, by };
+  }
+
+  // 撞到被時停的物體：速度夠快時，把動量存進對方（時停結束時一次釋放）
+  pushFrozen(other, axis) {
+    if (!other?.isBody || other.mods.time >= 0.05 || Math.abs(this[axis]) <= cfg.stasisImpact) return;
+    other[axis] += (this[axis] * this.mass) / other.mass;
   }
 
   checkGrounded(world) {

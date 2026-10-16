@@ -9,7 +9,7 @@ export class Field {
     this.y = y;
     this.target = target;
     this.channel = channel;
-    this.r = cfg.fieldRadius;
+    this.r = SKILLS[skillId].radius ?? cfg.fieldRadius;
     this.skillId = skillId;
     this.skill = SKILLS[skillId];
     this.dir = dir; // 定向重力的方向（單位向量）
@@ -141,10 +141,29 @@ export class FieldSystem {
     let drag = 0;
     let inField = false;
 
+    let addX = 0;
+    let addY = 0;
     for (const f of this.list) {
       if (!f.contains(x, y)) continue;
       const s = f.skill;
       if (this.jammedAt(x, y, s.tree)) continue; // 干擾裝置範圍內，這個顏色的場域失效
+      // 附著的時停只凍結目標本身（曠野之息式）：旁邊的東西照常動，撞上去的力會累積在目標上
+      if (f.target && s.type === 'timeMult' && s.value === 0 && f.target !== self) continue;
+      // 磁力只吸引金屬，疊加在原本的重力上（不取代它）
+      if (s.type === 'magnet') {
+        if (!self?.isMetal) continue;
+        const dx = f.x - x;
+        const dy = f.y - y;
+        const d = Math.hypot(dx, dy);
+        if (d > 0.001) {
+          const k = (G * s.value * Math.min(1, d / 8)) / d;
+          addX += dx * k;
+          addY += dy * k;
+        }
+        drag += s.drag ?? 0;
+        inField = true;
+        continue;
+      }
       inField = true;
       drag += s.drag ?? 0;
       switch (s.type) {
@@ -179,6 +198,8 @@ export class FieldSystem {
     let gy = hasDir ? dirY : G * this.base.y;
     gx *= gMult;
     gy *= gMult;
+    gx += addX;
+    gy += addY;
     // 重力盾：往外推，疊加在上面
     for (const sh of this.innate) {
       if (sh.owner === self) continue;

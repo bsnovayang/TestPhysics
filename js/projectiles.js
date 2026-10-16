@@ -105,6 +105,13 @@ export class Web {
   }
 
   expand(world, target = null) {
+    // 時間倒轉：一定要打中物體
+    if (SKILLS[this.skillId].type === 'rewind') {
+      if (!target) return this.fail(world, '時間倒轉要瞄準物體');
+      world.startRewind(target);
+      this.alive = false;
+      return;
+    }
     const x = target ? target.cx : this.x;
     const y = target ? target.cy : this.y;
     this.field = new Field(x, y, this.skillId, this.dir, target);

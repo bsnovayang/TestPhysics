@@ -52,6 +52,7 @@ export class IronBlock extends Box {
   constructor(tx, ty) {
     super(tx, ty);
     this.isIron = true;
+    this.isMetal = true;
     this.mass = 2;
     this.density = 3;
   }
