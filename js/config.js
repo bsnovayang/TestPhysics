@@ -37,6 +37,13 @@ export const cfg = {
   mpMax: 100,
   mpCostRatio: 0.1,
   mpRegen: 3,            // 每秒
+  // 靜止回復：站在地上完全不動、不按任何操作鍵一段時間後，MP 回復逐漸加速（解謎時不用乾等；戰鬥中很難做到）
+  restDelay: 1.5,        // 靜止多久開始加速
+  restDelayNearEnemy: 3, // 附近有敵人時要靜止多久
+  restEnemyRange: 160,   // 「附近」的距離（10 格）
+  restRamp: 1,           // 加速到最快需要的秒數
+  restRegen: 30,         // 最快的回復速度（每秒）
+  restHitLock: 3,        // 被打到後這段時間不會加速
   webSpeed: 480,
   webRange: 160,         // 約 10 格
 

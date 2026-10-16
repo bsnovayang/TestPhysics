@@ -26,7 +26,7 @@ export const HudRenderer = {
     ctx.fillStyle = '#3a3f4b';
     ctx.fillRect(28, 22, 104, 8);
     // 維持自身附著時，MP 條改成閃爍的黃色，提醒正在持續消耗
-    ctx.fillStyle = world.fields.channeling && Math.floor(world.time * 8) % 2 ? '#ffd34d' : '#4aa8ff';
+    ctx.fillStyle = world.fields.channeling && Math.floor(world.time * 8) % 2 ? '#ffd34d' : p.restBoost > 0 ? '#9fe8ff' : '#4aa8ff';
     ctx.fillRect(28, 22, Math.round((p.mp / cfg.mpMax) * 104), 8);
     const cost = cfg.mpMax * cfg.mpCostRatio;
     ctx.fillStyle = 'rgba(0,0,0,0.5)';

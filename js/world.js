@@ -422,6 +422,7 @@ export class World {
       return;
     }
     p.invT = cfg.invulnTime;
+    p.restLockT = cfg.restHitLock; // 被打到後一段時間不會靜止回復
     p.stunT = cfg.hitStun;
     p.dashT = 0;
     const away = fromX === null ? -p.facing : Math.sign(p.cx - fromX) || 1;

@@ -136,6 +136,18 @@ export const ActorRenderer = {
       ctx.fillRect(bx - 1, by - 1, 2, 2);
     }
 
+    // 靜止回復中：身邊往上飄的藍色光點
+    if (p.restBoost > 0) {
+      ctx.fillStyle = '#9fd8ff';
+      for (let i = 0; i < 6; i++) {
+        const t = (world.time * 0.8 + i / 6) % 1;
+        const x = Math.round(p.cx + Math.sin(i * 2.1 + world.time) * 9);
+        const y = Math.round(p.y + p.h - t * 34);
+        ctx.globalAlpha = p.restBoost * (1 - t);
+        ctx.fillRect(x, y, 2, 2);
+      }
+      ctx.globalAlpha = 1;
+    }
     if (p.timeScale !== 1) this.timeTint({ x: p.x, y: p.y, w: p.w, h: p.h, time: p.timeScale });
     if (p.hasteT > 0) {
       ctx.strokeStyle = 'rgba(74,168,255,0.8)';

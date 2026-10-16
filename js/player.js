@@ -33,6 +33,8 @@ export class Player extends Body {
     this.vy = 0;
     this.dashT = 0;
     this.hasteT = 0;
+    this.restT = 0;     // 靜止了多久（靜止回復）
+    this.restLockT = 0; // 被打到後不能靜止回復的剩餘時間
     this.invT = cfg.invulnTime;
     this.groundAxis = 'y';
     this.groundSign = 1;
@@ -143,10 +145,25 @@ export class Player extends Body {
     this.invT -= dt;
     this.hasteT -= dt;
     this.cannonCd -= dt;
-    if (!world.fields.channeling && !world.grab) this.mp = Math.min(cfg.mpMax, this.mp + cfg.mpRegen * dt);
+    if (!world.fields.channeling && !world.grab) this.mp = Math.min(cfg.mpMax, this.mp + this.regenRate(world, dt) * dt);
 
     this.handleActions(world);
     this.checkHazards(world);
+  }
+
+  // MP 回復速度：平常是 mpRegen；站著完全不動一段時間後逐漸加速到 restRegen（靜止回復）
+  regenRate(world, dt) {
+    const input = world.input;
+    const keys = ['KeyA', 'KeyD', 'KeyW', 'KeyS', 'Space', 'ShiftLeft', 'ShiftRight', 'Mouse0', 'KeyC', ...SLOT_KEYS.map((k) => k.code)];
+    const still = this.grounded && Math.abs(this.vx) < 1 && Math.abs(this.vy) < 1
+      && !keys.some((k) => input.isDown(k))
+      && !world.fields.channeling && !world.grab && !world.reflect && !world.possess;
+    this.restLockT = (this.restLockT ?? 0) - dt;
+    this.restT = still && this.restLockT <= 0 ? (this.restT ?? 0) + dt : 0;
+    const near = world.entities.some((e) => e.isEnemy && e.alive && !e.friendly && Math.hypot(e.cx - this.cx, e.cy - this.cy) < cfg.restEnemyRange);
+    const delay = near ? cfg.restDelayNearEnemy : cfg.restDelay;
+    this.restBoost = Math.max(0, Math.min(1, (this.restT - delay) / cfg.restRamp)); // 0～1，畫面用
+    return cfg.mpRegen + (cfg.restRegen - cfg.mpRegen) * this.restBoost;
   }
 
   // grip：地面抓地力倍率（冰面上很低，會滑）
