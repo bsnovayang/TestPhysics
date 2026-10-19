@@ -90,11 +90,15 @@ export class Player extends Body {
     // 跳躍（起跳速度固定，以正常重力換算）
     if (input.wasPressed('Space')) this.bufferT = cfg.jumpBuffer;
     else this.bufferT -= ldt;
-    if (this.bufferT > 0 && this.coyoteT > 0 && this.groundAxis && this.stunT <= 0) {
+    if (this.bufferT > 0 && (this.coyoteT > 0 || this.onBand) && this.groundAxis && this.stunT <= 0) {
       // 補上逐步積分損失的高度（g·dt/2），再多留一點餘裕，確保剛好 N 格高的台階跳得上去
       const v0 = Math.sqrt(2 * cfg.gravity * (cfg.jumpHeight + 0.15) * TILE) + (cfg.gravity * STEP) / 2;
-      if (this.groundAxis === 'y') this.vy = -this.groundSign * v0;
+      // 在彈床上：幾乎靜止時直接跳；彈動中則在離開彈床的那一刻加上起跳速度（越彈越高）
+      if (this.onBand && Math.abs(this.vy) > 60) this.bandPump = v0 * cfg.bandPump;
+      else if (this.onBand) this.vy = -v0;
+      else if (this.groundAxis === 'y') this.vy = -this.groundSign * v0;
       else this.vx = -this.groundSign * v0;
+      this.onBand = false;
       this.bufferT = 0;
       this.coyoteT = 0;
       this.grounded = false;

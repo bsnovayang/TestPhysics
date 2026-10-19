@@ -322,16 +322,40 @@ export class Turbine {
   update() {}
 }
 
-// 繩子的一段：一條直的繩子吊著正下方的物體，被熱源或熔岩燒斷（見 abilities/devices.js）
+// 繩子的一段：一條直的繩子吊著正下方的物體，被熱源或熔岩燒斷（見 abilities/devices.js）。
+// elastic = true 時是彈性繩（橡皮筋）
 export class RopeSeg {
-  constructor(tx, ty) {
+  constructor(tx, ty, elastic = false) {
     this.tx = tx;
     this.ty = ty;
+    this.elastic = elastic;
     this.x = tx * TILE + 7;
     this.y = ty * TILE;
     this.w = 2;
     this.h = TILE;
     this.isRope = true;
+    this.burn = 0;
+    this.alive = true;
+  }
+
+  get cx() { return this.x + this.w / 2; }
+  get cy() { return this.y + this.h / 2; }
+
+  update() {}
+}
+
+// 彈床：橫跨在兩面牆之間的彈性繩（連續的 t 合成一條）。掉上去的東西會被壓下去再彈起來；
+// 被冷卻時變硬，變成可以站的平台；被燒或壓得太深會斷（見 abilities/devices.js）
+export class Band {
+  constructor(tx, ty, widthTiles) {
+    this.x = tx * TILE;
+    this.y = ty * TILE + 8;
+    this.w = widthTiles * TILE;
+    this.h = 2;
+    this.isBand = true;
+    this.solid = false;
+    this.contacts = new Set();
+    this.sag = null; // 壓得最深的位置 { x, depth }（畫面用）
     this.burn = 0;
     this.alive = true;
   }

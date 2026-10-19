@@ -123,6 +123,23 @@ export const EntityRenderer = {
       ctx.fillRect(e.cx - 1, e.cy - 1, 2, 2);
       return;
     }
+    if (e.isBand) {
+      // 彈床：兩端接在牆上，被壓下去的地方畫成 V 字形；冷卻變硬時是淡藍色的直線
+      const b = Math.min(1, e.burn / cfg.ropeBurnTime);
+      ctx.fillStyle = b > 0 ? `rgb(${Math.round(224 + b * 31)},${Math.round(103 + b * 40)},${Math.round(154 - b * 100)})` : e.stiff ? '#bfe8ff' : '#e0679a';
+      const x0 = e.x;
+      const x1 = e.x + e.w;
+      const sx = e.sag ? e.sag.x : x0;
+      const sd = e.sag ? e.sag.depth : 0;
+      for (let x = x0; x < x1; x += 1) {
+        const t = x < sx ? (x - x0) / Math.max(1, sx - x0) : (x1 - x) / Math.max(1, x1 - sx);
+        ctx.fillRect(x, Math.round(e.y + sd * t), 1, 2);
+      }
+      ctx.fillStyle = '#5b6070';
+      ctx.fillRect(x0 - 1, e.y - 2, 3, 6);
+      ctx.fillRect(x1 - 2, e.y - 2, 3, 6);
+      return;
+    }
     if (e.isRope) {
       // 繩子：從固定點拉到吊著的物體（只在最上面那一段畫整條）；被燒時變紅、冒火星
       const rope = e.rope;
@@ -132,12 +149,16 @@ export const EntityRenderer = {
       const b = Math.min(1, e.burn);
       const len = Math.hypot(end.x - a.x, end.y - a.y);
       const n = Math.max(1, Math.round(len / 2));
+      // 普通繩子：棕色；彈性繩：粉紅色，拉長時變細；冷卻變硬：淡藍色
+      const stretched = e.elastic && rope && !rope.stiff && len > rope.length * 1.5;
+      const base = e.elastic ? (rope?.stiff ? '#bfe8ff' : '#e0679a') : '#8a6435';
+      const dark = e.elastic ? (rope?.stiff ? '#7fb6d6' : '#9c3a64') : '#5a4026';
       for (let k = 0; k < n; k++) {
         const t = k / n;
         const px = Math.round(a.x + (end.x - a.x) * t);
         const py = Math.round(a.y + (end.y - a.y) * t);
-        ctx.fillStyle = k % 3 === 0 ? '#5a4026' : b > 0 ? `rgb(${Math.round(140 + b * 115)},${Math.round(100 - b * 40)},${Math.round(60 - b * 30)})` : '#8a6435';
-        ctx.fillRect(px - 1, py, 2, 2);
+        ctx.fillStyle = k % 3 === 0 ? dark : b > 0 ? `rgb(${Math.round(140 + b * 115)},${Math.round(100 - b * 40)},${Math.round(60 - b * 30)})` : base;
+        ctx.fillRect(px - (stretched ? 0 : 1), py, stretched ? 1 : 2, 2);
       }
       if (b > 0 && Math.floor(world.time * 15) % 3 === 0) {
         ctx.fillStyle = '#ffb347';

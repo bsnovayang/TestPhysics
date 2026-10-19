@@ -471,6 +471,7 @@ export class World {
       this.updateElectric(dt);
       this.updateConveyors(dt);
       this.updateRopes(dt);
+      this.updateBands(dt);
       this.resolveImpacts();
       this.updateSwitches();
       this.recordHistory();

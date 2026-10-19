@@ -10,7 +10,7 @@
 //   switch      (tx, ty) => 開關（全部啟動時門會打開）
 //   run         (tx, ty, 長度) => 物件：連續的同一個字元合成一個物件
 //   replaceWith 處理完之後地圖上留下的圖塊（預設是空地）
-import { Turbine, RopeSeg, Generator, Electromagnet, IronBlock, Box, BoxSpawner, MovingPlatform, Blade, Crusher, Switch, FixedJammer, MovableJammer, IceBlock, Cooler, Heater, SteamPlatform } from './objects.js';
+import { Turbine, RopeSeg, Band, Generator, Electromagnet, IronBlock, Box, BoxSpawner, MovingPlatform, Blade, Crusher, Switch, FixedJammer, MovableJammer, IceBlock, Cooler, Heater, SteamPlatform } from './objects.js';
 import { Walker, Heavy, Jumper, Flyer, Turret, LaserEnemy } from './enemies.js';
 import { Presser, Balloon, CeilingWalker, ShieldSoldier, GravityBoss } from './gravity-enemies.js';
 import { Emitter, MirrorBox } from './light.js';
@@ -71,7 +71,9 @@ export const LEGEND = {
   'A': { name: '發電機（嵌在牆裡，空氣砲可以開關；和相鄰的導體相連）', entity: (tx, ty) => new Generator(tx, ty, true), replaceWith: '#' },
   'a': { name: '發電機（一開始是關著的；空氣砲可以開關）', entity: (tx, ty) => new Generator(tx, ty, false), replaceWith: '#' },
   'r': { name: '渦輪發電機（被蒸氣或風吹動就旋轉，轉起來時對相鄰的導體供電）', entity: (tx, ty) => new Turbine(tx, ty), replaceWith: '#' },
-  'y': { name: '繩子（從天花板垂下來，吊著正下方的物體；被熱源或熔岩燒斷）', entity: (tx, ty) => new RopeSeg(tx, ty) },
+  'y': { name: '繩子（從天花板垂下來，吊著正下方的物體；被熱源或熔岩燒斷，扯太猛或吊太重也會斷）', entity: (tx, ty) => new RopeSeg(tx, ty) },
+  'e': { name: '彈性繩（從天花板垂下來，吊著正下方的物體；會被拉長、回彈；冷卻時變硬）', entity: (tx, ty) => new RopeSeg(tx, ty, true) },
+  't': { name: '彈床（連續的 t 合成一條，兩端接在牆上；冷卻時變硬成為平台）', run: (tx, ty, n) => new Band(tx, ty, n) },
   'q': { name: '電磁鐵（嵌在牆裡，通電時吸引金屬；和相鄰的導體相連）', entity: (tx, ty) => new Electromagnet(tx, ty), replaceWith: '#' },
   '!': { name: '間歇噴發口', entity: (tx, ty) => new Vent(tx, ty) },
   '&': { name: '熔岩源', entity: (tx, ty) => new LiquidSource(tx, ty, 'lava', true) },

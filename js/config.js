@@ -93,6 +93,16 @@ export const cfg = {
   turbineSpinDown: 0.6,  // 沒有東西推時每秒減速多少
   conveyorSpeed: 60,     // 輸送帶的速度
   ropeBurnTime: 0.8,     // 繩子被燒多久會斷
+  ropeSnap: 380,         // 繩子一瞬間被扯直時能承受的衝量（速度 × 質量）；超過就斷
+  ropeMaxLoad: 3,        // 繩子能長時間吊住的重量（正常重力下質量 1 的倍數）；超過 ropeOverTime 秒就斷
+  ropeOverTime: 0.4,
+  elasticSag: 48,        // 彈性繩吊著質量 1 的東西時被拉長多少 px（決定彈性係數）
+  elasticMax: 3,         // 彈性繩最多能拉到原本長度的幾倍，超過就斷
+  elasticDamp: 0.8,      // 彈性繩沿著繩子方向的阻尼（每秒）
+  bandSag: 12,           // 彈床被質量 1 的東西壓著時下陷多少 px（決定彈性係數）
+  bandMaxDepth: 64,      // 彈床最多能被壓下去多深，超過就斷
+  bandPump: 0.8,         // 在彈床上按跳：離開彈床時加上起跳速度的幾倍
+  bandDamp: 0.3,         // 彈床的阻尼（每秒）：越小彈得越久
 
   // 空間
   blinkRange: 80,            // 約 5 格
