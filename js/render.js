@@ -6,6 +6,7 @@ import { ActorRenderer } from './render/actors.js';
 import { FieldRenderer } from './render/fields.js';
 import { EffectRenderer } from './render/effects.js';
 import { HudRenderer } from './render/hud.js';
+import { SceneryRenderer } from './render/scenery.js';
 
 export class Renderer {
   constructor(canvas) {
@@ -47,9 +48,10 @@ export class Renderer {
     ctx.imageSmoothingEnabled = false;
     ctx.fillStyle = C.bg;
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-    this.drawGrid();
+    if (!this.drawScenery(world)) this.drawGrid(); // 有場景（遺跡）的房間畫背景，取代格線
     this.drawFieldFills(world);
     this.drawTiles(world);
+    this.drawDecor(world);
     // 實驗版本可以自訂水的畫法（粒子水），或在原本的水上加特效
     if (!world.water.draw?.(this.ctx, world)) this.drawWater(world);
     if (!world.water.drawsLava) this.drawLava(world);
@@ -85,4 +87,4 @@ export class Renderer {
 }
 
 // 各類別的畫法放在 js/render/，掛到 Renderer 上
-Object.assign(Renderer.prototype, TerrainRenderer, EntityRenderer, ActorRenderer, FieldRenderer, EffectRenderer, HudRenderer);
+Object.assign(Renderer.prototype, TerrainRenderer, EntityRenderer, ActorRenderer, FieldRenderer, EffectRenderer, HudRenderer, SceneryRenderer);
