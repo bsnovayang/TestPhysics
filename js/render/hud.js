@@ -32,12 +32,16 @@ export const HudRenderer = {
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     for (let x = cost; x < cfg.mpMax; x += cost) ctx.fillRect(28 + Math.round((x / cfg.mpMax) * 104), 22, 1, 8);
 
-    // 房間名稱與提示
+    // 房間名稱與提示（正式遊戲只顯示房間名稱，沒有提示）
     ctx.textAlign = 'center';
     ctx.fillStyle = C.hud;
-    ctx.fillText(`${world.room.name}（${world.roomIndex + 1}/${world.roomCount}）`, VIEW_W / 2, 10);
-    ctx.fillStyle = C.dim;
-    ctx.fillText(cfg.showHints ? world.room.hint : '卡關時按 / 顯示提示', VIEW_W / 2, 25);
+    if (world.mode === 'game') {
+      ctx.fillText(world.room.name, VIEW_W / 2, 10);
+    } else {
+      ctx.fillText(`${world.room.name}（${world.roomIndex + 1}/${world.roomCount}）`, VIEW_W / 2, 10);
+      ctx.fillStyle = C.dim;
+      ctx.fillText(cfg.showHints ? world.room.hint : '卡關時按 / 顯示提示', VIEW_W / 2, 25);
+    }
 
     // 訊息
     world.toasts.forEach((t, i) => {
@@ -87,9 +91,61 @@ export const HudRenderer = {
     });
 
     ctx.fillStyle = C.dim;
-    ctx.fillText('H 說明　Tab 裝備', 6, 44);
-    if (this.versionLabel) ctx.fillText('水：' + this.versionLabel, 6, 58);
+    if (world.mode === 'game') {
+      ctx.fillText('H 說明　Tab 裝備　T 重置房間', 6, 44);
+      this.drawMinimap(world);
+    } else {
+      ctx.fillText('H 說明　Tab 裝備', 6, 44);
+      if (this.versionLabel) ctx.fillText('水：' + this.versionLabel, 6, 58);
+    }
     ctx.textBaseline = 'alphabetic';
+  },
+
+  // 小地圖（正式遊戲，右下角）：去過的房間、目前的房間（閃爍）、
+  // 去過的房間邊緣有開口但還沒進去的隔壁房間（虛線框：記得那裡還有路）
+  drawMinimap(world) {
+    const ctx = this.ctx;
+    const rooms = world.rooms.filter((r) => r.pos);
+    if (!rooms.length) return;
+    const cw = 14;
+    const ch = 8;
+    const xs = rooms.map((r) => r.pos.x);
+    const ys = rooms.map((r) => r.pos.y);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    const cols = Math.max(...xs) - minX + 1;
+    const rowsN = Math.max(...ys) - minY + 1;
+    const w = cols * cw + 6;
+    const h = rowsN * ch + 6;
+    const x0 = VIEW_W - w - 4;
+    const y0 = VIEW_H - h - 4;
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(x0, y0, w, h);
+    const visited = new Set(world.save.visited);
+    const at = (r) => [x0 + 3 + (r.pos.x - minX) * cw, y0 + 3 + (r.pos.y - minY) * ch];
+    const known = new Set();
+    for (const r of rooms) {
+      if (!visited.has(r.id)) continue;
+      for (const [dx, dy] of roomOpenings(r)) {
+        const n = rooms.find((o) => o.pos.x === r.pos.x + dx && o.pos.y === r.pos.y + dy);
+        if (n && !visited.has(n.id)) known.add(n);
+      }
+    }
+    for (const r of known) {
+      const [x, y] = at(r);
+      ctx.strokeStyle = 'rgba(138,147,166,0.6)';
+      ctx.setLineDash([2, 2]);
+      ctx.strokeRect(x + 1.5, y + 1.5, cw - 3, ch - 3);
+      ctx.setLineDash([]);
+    }
+    for (const r of rooms) {
+      if (!visited.has(r.id)) continue;
+      const [x, y] = at(r);
+      const here = r === world.room;
+      ctx.fillStyle = here ? (Math.floor(world.time * 3) % 2 ? '#ffe9a8' : '#c9a85c') : '#4a5468';
+      ctx.fillRect(x + 1, y + 1, cw - 2, ch - 2);
+      if (r.map.some((row) => row.includes('s'))) { ctx.fillStyle = '#ffe9a8'; ctx.fillRect(x + cw / 2 - 1, y + ch / 2 - 1, 2, 2); }
+    }
   },
 
   // 魔王房間：畫面下方顯示重力時鐘與魔王的血條；王身上顯示目前的重力方向與倒數
@@ -247,3 +303,18 @@ export const HudRenderer = {
     );
   },
 };
+
+// 房間四邊有開口（不是牆）的方向，用來畫小地圖上「還沒去過的路」
+const openingCache = new WeakMap();
+function roomOpenings(room) {
+  if (openingCache.has(room)) return openingCache.get(room);
+  const m = room.map;
+  const solid = (c) => c === '#';
+  const list = [];
+  if (m.some((row) => !solid(row[0]))) list.push([-1, 0]);
+  if (m.some((row) => !solid(row[row.length - 1]))) list.push([1, 0]);
+  if ([...m[0]].some((c) => !solid(c))) list.push([0, -1]);
+  if ([...m[m.length - 1]].some((c) => !solid(c))) list.push([0, 1]);
+  openingCache.set(room, list);
+  return list;
+}

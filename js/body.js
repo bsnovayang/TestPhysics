@@ -181,7 +181,7 @@ export class Body {
   }
 
   isOutOfBounds() {
-    return this.y > VIEW_H + 48 || this.y + this.h < -48 || this.x > VIEW_W + 48;
+    return this.y > VIEW_H + 48 || this.y + this.h < -48 || this.x > VIEW_W + 48 || this.x + this.w < -48;
   }
 
   touchingLava(world, inset = 3) {

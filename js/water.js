@@ -43,6 +43,7 @@ export class WaterSystem {
 
   // 液體和蒸氣都進不去的格子：實心地形
   blocked(tx, ty) {
+    if (this.map.clampEdges && !this.inBounds(tx, ty)) return true;
     return this.map.isSolid(tx, ty);
   }
 

@@ -19,6 +19,74 @@ export const EntityRenderer = {
 
   drawEntity(world, e) {
     const ctx = this.ctx;
+    if (e.isSavePoint) {
+      // 女神像：石台＋發光的人形；碰到存檔時光暈變亮
+      const x = e.x;
+      const y = e.y;
+      const g = 0.25 + e.glow * 0.6 + Math.sin(world.time * 2) * 0.08;
+      ctx.fillStyle = `rgba(255,233,168,${g.toFixed(2)})`;
+      ctx.beginPath();
+      ctx.arc(x + 8, y + 9, 10 + e.glow * 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#5b6070';
+      ctx.fillRect(x + 1, y + 26, 14, 6);
+      ctx.fillStyle = '#c9cfdc';
+      ctx.fillRect(x + 6, y + 4, 4, 4);   // 頭
+      ctx.fillRect(x + 4, y + 9, 8, 13);  // 身體
+      ctx.fillRect(x + 3, y + 22, 10, 4); // 裙擺
+      ctx.fillStyle = '#ffe9a8';
+      ctx.fillRect(x + 2, y + 11, 2, 6);  // 張開的手
+      ctx.fillRect(x + 12, y + 11, 2, 6);
+      return;
+    }
+    if (e.isChest) {
+      const x = e.x;
+      const y = e.y;
+      ctx.fillStyle = '#7a4e2a';
+      ctx.fillRect(x + 1, y + 4, 14, 8);
+      ctx.fillStyle = '#ffd34d';
+      ctx.fillRect(x + 1, y + 4, 14, 1);
+      ctx.fillRect(x + 7, y + 6, 2, 3);
+      if (e.opened) {
+        ctx.fillStyle = '#5a3a1f';
+        ctx.fillRect(x + 1, y - 2, 14, 3); // 掀開的蓋子
+      } else {
+        ctx.fillStyle = '#8f5c33';
+        ctx.fillRect(x + 1, y, 14, 4);
+        ctx.fillStyle = 'rgba(255,233,168,0.5)';
+        if (Math.floor(world.time * 3) % 2) ctx.fillRect(x + 3, y - 3, 1, 1);
+      }
+      return;
+    }
+    if (e.isUpgrade) {
+      const bob = Math.round(Math.sin(world.time * 3) * 2);
+      ctx.fillStyle = 'rgba(74,168,255,0.35)';
+      ctx.beginPath();
+      ctx.arc(e.cx, e.cy + bob, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#4aa8ff';
+      ctx.fillRect(e.x + 1, e.y + 1 + bob, e.w - 2, e.h - 2);
+      ctx.fillStyle = '#cfe8ff';
+      ctx.fillRect(e.x + 2, e.y + 2 + bob, 3, 2);
+      return;
+    }
+    if (e.isLever) {
+      // 拉桿：打開前往右倒、黃色把手；打開後往左倒
+      const bx = e.x + e.w / 2;
+      const by = e.y + e.h - 2;
+      ctx.fillStyle = '#5b6070';
+      ctx.fillRect(bx - 5, by - 1, 10, 3);
+      ctx.strokeStyle = '#c9cfdc';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(bx, by);
+      ctx.lineTo(bx + (e.on ? -6 : 6), by - 10);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      ctx.fillStyle = e.on ? '#7fe08a' : '#ffd34d';
+      ctx.fillRect(bx + (e.on ? -8 : 4), by - 12, 4, 4);
+      return;
+    }
     if (e.isLavaBlob) {
       // 飛行中的熔岩塊；被時停時畫成暗紅色並加框（可以站、不燙）
       // 用 2 px 的小方塊組成（和熔岩池同樣的像素質感與顏色），四個角挖掉，看起來像一團熔岩

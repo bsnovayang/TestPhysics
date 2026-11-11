@@ -8,11 +8,16 @@ import { TILE, COLS, ROWS } from './config.js';
 //   I  冰牆格（實心、很滑；被光照到會融化，水遇冷會結成冰牆格）
 //   Z  熔岩（載入時轉成會流動的熔岩液體，由 WaterSystem 處理）
 //   Q  石頭（熔岩碰到水或冷凍裝置凝固而成；實心、永久）
+//   {  捷徑閘門（正式遊戲：從另一側的拉桿打開後一直保持打開）
 export class TileMap {
-  constructor(rows) {
+  // clampEdges：正式遊戲用。地圖外面的格子等於最靠近的邊緣格，所以邊緣的開口可以走出去（通往隔壁房間），
+  // 牆外面還是牆。測試房間維持原本的規則（左邊是牆，其他三邊是空的）
+  constructor(rows, { clampEdges = false } = {}) {
     // 存成字元陣列，讓冰可以在遊戲中出現或消失
     this.rows = rows.map((r) => r.split(''));
     this.doorOpen = false;
+    this.gateOpen = false;
+    this.clampEdges = clampEdges;
   }
 
   set(tx, ty, c) {
@@ -20,6 +25,7 @@ export class TileMap {
   }
 
   get(tx, ty) {
+    if (this.clampEdges) return this.rows[Math.max(0, Math.min(ROWS - 1, ty))][Math.max(0, Math.min(COLS - 1, tx))];
     if (tx < 0) return '#';
     if (tx >= COLS || ty < 0 || ty >= ROWS) return ' ';
     return this.rows[ty][tx];
@@ -27,7 +33,7 @@ export class TileMap {
 
   isSolid(tx, ty) {
     const c = this.get(tx, ty);
-    return c === '#' || c === '+' || c === '-' || c === '*' || c === '>' || c === '<' || c === 'I' || c === 'Q' || (c === 'D' && !this.doorOpen);
+    return c === '#' || c === '+' || c === '-' || c === '*' || c === '>' || c === '<' || c === 'I' || c === 'Q' || (c === 'D' && !this.doorOpen) || (c === '{' && !this.gateOpen);
   }
 
   pointSolid(x, y) {

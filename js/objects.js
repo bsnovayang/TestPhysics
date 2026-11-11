@@ -557,3 +557,99 @@ export class Switch {
     else this.pressed = now;
   }
 }
+
+// 女神像（存檔點）：碰到時存檔，HP、MP 回滿。倒下時回到最後碰過的女神像
+export class SavePoint {
+  constructor(tx, ty) {
+    this.tx = tx;
+    this.ty = ty;
+    this.x = tx * TILE;
+    this.y = (ty - 1) * TILE;
+    this.w = TILE;
+    this.h = TILE * 2;
+    this.isSavePoint = true;
+    this.touching = false;
+    this.glow = 0;
+    this.alive = true;
+  }
+
+  get cx() { return this.x + this.w / 2; }
+  get cy() { return this.y + this.h / 2; }
+
+  update(world, dt) {
+    const t = rectsOverlap(this, world.player);
+    if (t && !this.touching) { world.touchSavePoint(this); this.glow = 1; }
+    this.touching = t;
+    this.glow = Math.max(0, this.glow - dt * 0.8);
+  }
+}
+
+// 寶箱：碰到時打開，拿到房間設定的能力（room.chest）。打開過就一直是打開的
+export class Chest {
+  constructor(tx, ty) {
+    this.x = tx * TILE;
+    this.y = ty * TILE + 4;
+    this.w = TILE;
+    this.h = TILE - 4;
+    this.isChest = true;
+    this.opened = false;
+    this.alive = true;
+  }
+
+  get cx() { return this.x + this.w / 2; }
+  get cy() { return this.y + this.h / 2; }
+
+  update(world) {
+    if (!this.opened && rectsOverlap(this, world.player)) {
+      this.opened = true;
+      world.openChest(this);
+    }
+  }
+}
+
+// 升級（MP 上限）：飄在空中的光球，碰到就拿到。拿過就不再出現
+export class Upgrade {
+  constructor(tx, ty) {
+    this.x = tx * TILE + 3;
+    this.y = ty * TILE + 3;
+    this.w = TILE - 6;
+    this.h = TILE - 6;
+    this.isUpgrade = true;
+    this.alive = true;
+  }
+
+  get cx() { return this.x + this.w / 2; }
+  get cy() { return this.y + this.h / 2; }
+
+  update(world) {
+    if (rectsOverlap(this, world.player)) {
+      this.alive = false;
+      world.collectUpgrade(this);
+    }
+  }
+}
+
+// 拉桿：用空氣砲打一下，打開這個房間的捷徑閘門（room.flagGate）；之後一直保持打開
+export class Lever {
+  constructor(tx, ty) {
+    this.x = tx * TILE + 3;
+    this.y = ty * TILE + 2;
+    this.w = TILE - 6;
+    this.h = TILE - 2;
+    this.isLever = true;
+    this.hittable = true;
+    this.on = false;
+    this.alive = true;
+  }
+
+  get cx() { return this.x + this.w / 2; }
+  get cy() { return this.y + this.h / 2; }
+
+  update() {}
+
+  onAirShot(world) {
+    if (this.on) return;
+    this.on = true;
+    world.pullLever(this);
+  }
+}

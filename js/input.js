@@ -1,5 +1,5 @@
 // 鍵盤與滑鼠輸入。滑鼠按鍵以 'Mouse0'（左）、'Mouse1'（中）、'Mouse2'（右）表示，和鍵盤共用同一套查詢。
-const PREVENT = new Set(['Space', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Backquote', 'F2']);
+const PREVENT = new Set(['Space', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Backquote', 'F2', 'F8', 'F9']);
 
 export class Input {
   constructor() {

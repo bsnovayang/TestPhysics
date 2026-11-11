@@ -5,6 +5,14 @@ import { Renderer } from './render.js';
 import { SKILLS, SKILL_ORDER, DEBUG_KEYS, TREE_COLORS, keyLabel } from './skills.js';
 import { createDebugPanel } from './debug.js';
 import { ROOMS } from './rooms.js';
+import { AREA } from './areas/gravity.js';
+import { newSave, loadSave, clearSave } from './save.js';
+
+// 頁面模式：index.html 是正式遊戲（body data-mode="game"），lab.html 是實驗室（測試房間）。
+// 正式遊戲預設關閉除錯功能，網址加 ?debug 才打開
+const MODE = document.body.dataset.mode === 'game' ? 'game' : 'lab';
+const params = new URLSearchParams(location.search);
+const DEBUG = MODE === 'lab' || params.has('debug');
 
 // 水的版本：預設為 Noita 風像素水（正式版）；?water=cell（原版格子水）、?water=particle（粒子版）、?water=fx（原版＋粒子特效）用來比較
 const DEFAULT_WATER = 'pixel';
@@ -24,7 +32,11 @@ input.attach(canvas);
 // 畫布上的文字要等像素字型載入完才會用到它
 await document.fonts.load('12px "FusionPixel"', '測試').catch(() => {});
 const renderer = new Renderer(canvas);
-const world = new World(input, { createWater: waterModule.createWater });
+const world = new World(input, {
+  createWater: waterModule.createWater,
+  mode: MODE,
+  rooms: MODE === 'game' ? AREA.rooms : ROOMS,
+});
 if (waterModule.createFx) renderer.fx = waterModule.createFx();
 renderer.versionLabel = WATER_VERSIONS[waterMode].name;
 buildVersionLinks();
@@ -45,18 +57,33 @@ function isPaused() {
   return !started || paused || !overlays.loadout.hidden || !overlays.levels.hidden;
 }
 
-overlays.start.addEventListener('click', () => {
-  started = true;
-  overlays.start.hidden = true;
-});
-
-// 開發用網址參數：?autostart 跳過開始畫面，?room=N 直接進入第 N 個房間（從 1 開始）
-const params = new URLSearchParams(location.search);
-if (params.has('autostart')) {
+function startPlaying() {
   started = true;
   overlays.start.hidden = true;
 }
-if (params.has('room')) {
+
+if (MODE === 'game') {
+  // 正式遊戲：繼續（有存檔時）或新遊戲
+  const saved = loadSave();
+  const btnContinue = document.getElementById('btn-continue');
+  btnContinue.hidden = !saved;
+  btnContinue.addEventListener('click', () => { world.beginGame(loadSave() ?? newSave()); startPlaying(); });
+  document.getElementById('btn-new').addEventListener('click', () => {
+    clearSave();
+    world.beginGame(newSave());
+    startPlaying();
+  });
+  document.getElementById('help-debug').hidden = !DEBUG;
+} else {
+  overlays.start.addEventListener('click', startPlaying);
+}
+
+// 開發用網址參數：?autostart 跳過開始畫面（正式遊戲會繼續存檔），?room=N 直接進入第 N 個房間（從 1 開始）
+if (params.has('autostart')) {
+  if (MODE === 'game') world.beginGame(loadSave() ?? newSave());
+  startPlaying();
+}
+if (params.has('room') && DEBUG) {
   world.loadRoom(Number(params.get('room')) - 1);
   world.toasts = world.toasts.slice(-1); // 只留新房間的名稱
 }
@@ -80,10 +107,11 @@ function buildLoadout() {
   SKILL_ORDER.forEach((id, i) => {
     const sk = SKILLS[id];
     if (sk.shelved) return; // 暫緩的技能（洗腦、附身）不列出，除錯按鍵仍然可以用
+    if (MODE === 'game' && !world.save.abilities.includes(id)) return; // 正式遊戲只列出拿到的能力
     const btn = document.createElement('button');
     btn.className = 'skill';
     btn.style.borderLeftColor = TREE_COLORS[sk.tree];
-    btn.innerHTML = `<small>${keyLabel(DEBUG_KEYS[i])}</small>${sk.name}`;
+    btn.innerHTML = `<small>${MODE === 'game' ? '' : keyLabel(DEBUG_KEYS[i])}</small>${sk.name}`;
     btn.onclick = () => { world.loadout[selectedSlot] = id; buildLoadout(); };
     skillsEl.appendChild(btn);
   });
@@ -94,10 +122,27 @@ function toggleLoadout(show = overlays.loadout.hidden) {
   if (show) buildLoadout();
 }
 
+// 正式遊戲沒有打開除錯時，只接受這些按鍵
+const GAME_KEYS = new Set(['Tab', 'Escape', 'KeyH', 'KeyT']);
+
 // ---- 不受暫停影響的按鍵 ----
 input.onKey((code) => {
   if (!started) return;
+  if (!DEBUG && !GAME_KEYS.has(code)) return;
   switch (code) {
+    case 'F8':
+      // 除錯：拿到這個區域的所有能力（寶箱給的）
+      if (MODE !== 'game') break;
+      for (const r of world.rooms) if (r.chest && !world.save.abilities.includes(r.chest)) world.save.abilities.push(r.chest);
+      world.loadout = world.loadout.map((id, i) => id ?? world.save.abilities.find((a) => !world.loadout.includes(a)) ?? null);
+      world.toast('除錯：拿到所有能力');
+      break;
+    case 'F9':
+      if (MODE !== 'game') break;
+      clearSave();
+      world.beginGame(newSave());
+      world.toast('除錯：清除存檔，重新開始');
+      break;
     case 'Tab':
       toggleLoadout();
       break;
@@ -132,7 +177,8 @@ input.onKey((code) => {
       break;
     case 'KeyT':
       world.player.mp = cfg.mpMax;
-      world.loadRoom(world.roomIndex);
+      if (MODE === 'game') world.resetRoom(); // 回到進入房間後站穩過的位置
+      else world.loadRoom(world.roomIndex);
       break;
     case 'KeyG':
       cfg.showHitboxes = !cfg.showHitboxes;
@@ -166,8 +212,8 @@ input.onKey((code) => {
 function buildLevelGrid(box) {
   if (!box) return;
   box.innerHTML = '';
-  ROOMS.forEach((room, i) => {
-    const [letter, ...rest] = room.name.split(' ');
+  world.rooms.forEach((room, i) => {
+    const [letter, ...rest] = MODE === 'game' ? [String(i + 1), room.name] : room.name.split(' ');
     const btn = document.createElement('button');
     btn.innerHTML = '<b>' + letter + '</b><small>' + rest.join(' ') + '</small>';
     btn.title = room.name;
@@ -177,8 +223,7 @@ function buildLevelGrid(box) {
       world.player.hp = cfg.hp;
       world.player.mp = cfg.mpMax;
       world.loadRoom(i);
-      started = true;
-      overlays.start.hidden = true;
+      startPlaying();
       toggleLevels(false);
     });
     box.appendChild(btn);

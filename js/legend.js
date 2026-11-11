@@ -10,7 +10,7 @@
 //   switch      (tx, ty) => 開關（全部啟動時門會打開）
 //   run         (tx, ty, 長度) => 物件：連續的同一個字元合成一個物件
 //   replaceWith 處理完之後地圖上留下的圖塊（預設是空地）
-import { Turbine, RopeSeg, Band, Generator, Electromagnet, IronBlock, Box, BoxSpawner, MovingPlatform, Blade, Crusher, Switch, FixedJammer, MovableJammer, IceBlock, Cooler, Heater, SteamPlatform } from './objects.js';
+import { SavePoint, Chest, Upgrade, Lever, Turbine, RopeSeg, Band, Generator, Electromagnet, IronBlock, Box, BoxSpawner, MovingPlatform, Blade, Crusher, Switch, FixedJammer, MovableJammer, IceBlock, Cooler, Heater, SteamPlatform } from './objects.js';
 import { Walker, Heavy, Jumper, Flyer, Turret, LaserEnemy } from './enemies.js';
 import { Presser, Balloon, CeilingWalker, ShieldSoldier, GravityBoss } from './gravity-enemies.js';
 import { Emitter, MirrorBox } from './light.js';
@@ -26,6 +26,7 @@ export const LEGEND = {
   '#': { name: '地面／牆', tile: true },
   '^': { name: '尖刺', tile: true },
   'D': { name: '門', tile: true },
+  '{': { name: '捷徑閘門（正式遊戲：被拉桿打開後一直保持打開）', tile: true },
   '|': { name: '移動平台的折返標記', tile: true },
   'I': { name: '冰牆格（會融化）', tile: true },
   'Z': { name: '熔岩', tile: true },
@@ -57,6 +58,12 @@ export const LEGEND = {
   'W': { name: '蒸氣渦輪', switch: (tx, ty) => new Switch(tx, ty, 'steam') },
   'F': { name: '按鈕（踩過一次就鎖住）', switch: (tx, ty) => new Switch(tx, ty, 'button') },
   'J': { name: '通電門的開關（這一格有電時啟動）', switch: (tx, ty) => new Switch(tx, ty, 'power') },
+
+  // 正式遊戲
+  's': { name: '女神像（存檔點，碰到時 HP、MP 回滿；放在地板上，佔兩格高）', entity: (tx, ty) => new SavePoint(tx, ty) },
+  'c': { name: '寶箱（碰到就打開，拿到房間設定的能力 chest）', entity: (tx, ty) => new Chest(tx, ty) },
+  'o': { name: '升級：MP 上限（拿過就不再出現）', entity: (tx, ty) => new Upgrade(tx, ty) },
+  '}': { name: '拉桿（空氣砲打一下，打開房間的捷徑閘門 flagGate）', entity: (tx, ty) => new Lever(tx, ty) },
 
   // 機關與裝置
   'O': { name: '旋轉刀片', entity: (tx, ty) => new Blade(tx, ty) },

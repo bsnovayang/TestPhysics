@@ -22,6 +22,9 @@ import { BlinkAbility } from './abilities/blink.js';
 import { CharmAbility } from './abilities/charm.js';
 import { PossessAbility } from './abilities/possess.js';
 import { makeRng } from './rng.js';
+import { newSave, writeSave, roomSeed } from './save.js';
+
+const MP_BASE = cfg.mpMax;
 
 function parseRoom(def) {
   const rows = def.map.map((r) => r.padEnd(COLS, ' ').slice(0, COLS));
@@ -61,14 +64,21 @@ function parseRoom(def) {
 
 export class World {
   // options.createWater：建立水系統的函式（實驗版本可以換成粒子水）
+  // options.mode：'lab'（實驗室：測試房間，各自獨立，依序切換）或 'game'（正式遊戲：房間有世界座標，走出邊緣換到隔壁房間）
+  // options.rooms：房間清單（預設是測試房間）；options.save：世界狀態（見 save.js）
   constructor(input, options = {}) {
     this.createWater = options.createWater ?? ((map) => new WaterSystem(map));
+    this.mode = options.mode ?? 'lab';
+    this.rooms = options.rooms ?? ROOMS;
+    this.save = options.save ?? newSave();
+    this.safeSpot = null; // 正式遊戲：進入房間後第一次站穩的位置（掉進尖刺時回到這裡）
     this.input = input;
     this.mouse = { x: 0, y: 0 };
     this.fields = new FieldSystem();
     this.portals = new PortalSystem();
     this.player = new Player();
     this.loadout = [...DEFAULT_LOADOUT];
+    if (this.mode === 'game') this.loadout = SLOT_KEYS.map((_, i) => this.save.abilities[i] ?? null); // 正式遊戲：只有拿到的能力
     this.particles = [];
     this.popups = [];
     this.beams = [];
@@ -79,27 +89,39 @@ export class World {
     this.loadRoom(0);
   }
 
-  get room() { return ROOMS[this.roomIndex]; }
-  get roomCount() { return ROOMS.length; }
+  get room() { return this.rooms[this.roomIndex]; }
+  get roomCount() { return this.rooms.length; }
 
-  loadRoom(index) {
-    this.roomIndex = ((index % ROOMS.length) + ROOMS.length) % ROOMS.length;
-    // 會影響玩法的亂數（火山彈的角度、熔岩塊的速度）用固定種子，每次進入房間都一樣
-    this.rng = makeRng(1000 + this.roomIndex);
+  // opts.entry：從隔壁房間走過來（位置已換算到這個房間、保留速度）；opts.at：重生在這個位置（掉進尖刺後回到站穩過的地方）；
+  // 都沒有時出現在起點 P（沒有 P 時在女神像旁邊）
+  loadRoom(index, opts = {}) {
+    const fromIndex = this.roomIndex;
+    this.roomIndex = ((index % this.rooms.length) + this.rooms.length) % this.rooms.length;
+    // 會影響玩法的亂數（火山彈的角度、熔岩塊的速度）用固定種子（依房間 id 或名稱），每次進入房間都一樣
+    this.rng = makeRng(roomSeed(this.room));
     const parsed = parseRoom(this.room);
-    this.map = new TileMap(parsed.rows);
+    this.map = new TileMap(parsed.rows, { clampEdges: this.mode === 'game' });
+    this.map.gateOpen = !!this.save.flags[this.room.flagGate];
+    this.map.doorOpen = !!this.save.flags['door:' + this.roomKey];
     this.water = this.createWater(this.map);
     for (const c of parsed.water) this.water.add(c.tx, c.ty, 1);
     // 熔岩的基準量：噴發口只會把超過這個量的熔岩吸回去；上升的熔岩會提高基準量
     this.lavaBaseline = this.water.lava.reduce((a, b) => a + b, 0);
     this.riseT = 0;
     this.computeLiquidBudget();
-    this.entities = parsed.entities;
+    // 拿過的升級不再出現；打開過的寶箱、拉過的拉桿保持原狀
+    this.entities = parsed.entities.filter((e) => !(e.isUpgrade && this.save.flags['up:' + this.roomKey]));
+    for (const e of this.entities) {
+      if (e.isChest) e.opened = !!this.save.flags['chest:' + this.roomKey];
+      if (e.isLever) e.on = this.map.gateOpen;
+    }
     this.switches = parsed.switches;
     this.doorTiles = this.map.doorTiles();
     this.spawn = parsed.spawn;
     this.projectiles = [];
-    this.fields.clear();
+    // 走到隔壁房間時，附著在自己身上的場域（例如維持中的反重力）跟著過去，其他場域留在原房間（消失）
+    if (opts.entry) this.fields.list = this.fields.list.filter((f) => f.target === this.player);
+    else this.fields.clear();
     this.dirAim = null;
     this.grab = null;
     this.allyOrder = null;
@@ -107,21 +129,134 @@ export class World {
     this.ropes = null; // 繩子在第一次更新時和吊著的物體連起來
     this.cooldowns = {};
     this.bolts = [];
-    if (this.room.loadout) this.loadout = [...this.room.loadout]; // 測試房間可以指定裝備
+    if (this.room.loadout && this.mode === 'lab') this.loadout = [...this.room.loadout]; // 測試房間可以指定裝備
     this.fields.base = { x: 0, y: 1 }; // 重力魔王轉過的重力，換房間或重來時恢復向下
     this.hasBoss = this.entities.some((e) => e.isBoss);
     this.portals.clear();
-    this.player.respawn(this.spawn);
+    if (opts.entry) {
+      this.player.enterAt(opts.entry);
+    } else {
+      this.player.respawn(this.spawn);
+      if (opts.at) { this.player.x = opts.at.x; this.player.y = opts.at.y; }
+    }
+    this.safeSpot = opts.at ?? null;
     this.pendingRoom = null;
-    this.toast(this.room.name);
+    this.pendingOpts = null;
+    if (this.mode === 'game') {
+      if (!this.save.visited.includes(this.roomKey)) this.save.visited.push(this.roomKey);
+      // 重來（掉進尖刺、按 T）時不重複顯示房間名稱
+      if (fromIndex !== this.roomIndex || !opts.at) this.toast(this.room.name);
+    } else {
+      this.toast(this.room.name);
+    }
   }
 
-  requestRoom(index) {
+  // 房間在世界狀態裡的代號
+  get roomKey() { return this.room.id ?? this.room.name; }
+
+  requestRoom(index, opts = {}) {
     this.pendingRoom = index;
+    this.pendingOpts = opts;
   }
 
+  // 重置房間：正式遊戲回到進入房間後站穩過的位置；測試房間回到起點
   resetRoom() {
-    this.requestRoom(this.roomIndex);
+    this.requestRoom(this.roomIndex, this.mode === 'game' && this.safeSpot ? { at: this.safeSpot } : {});
+  }
+
+  // ---- 正式遊戲：世界座標與世界狀態 ----
+
+  // 世界座標上，和目前房間相鄰（dx, dy）的房間
+  neighbor(dx, dy) {
+    const p = this.room.pos;
+    if (!p) return -1;
+    return this.rooms.findIndex((r) => r.pos && r.pos.x === p.x + dx && r.pos.y === p.y + dy);
+  }
+
+  // 玩家的中心走出畫面邊緣時，換到隔壁房間（位置換算過去、速度保留）。往上換房間時多推一把
+  tryEdgeExit() {
+    const p = this.player;
+    const W = COLS * 16;
+    const H = ROWS * 16;
+    let dx = 0;
+    let dy = 0;
+    if (p.cx > W) dx = 1;
+    else if (p.cx < 0) dx = -1;
+    else if (p.cy > H) dy = 1;
+    else if (p.cy < 0) dy = -1;
+    if (!dx && !dy) return false;
+    const target = this.neighbor(dx, dy);
+    if (target < 0) return false;
+    this.requestRoom(target, {
+      entry: { x: p.x - dx * W, y: p.y - dy * H, vx: p.vx, vy: dy < 0 ? Math.min(p.vy, -cfg.edgeBoost) : p.vy },
+    });
+    return true;
+  }
+
+  // 開始或繼續正式遊戲：套用世界狀態（能力、MP 上限），從最後存檔的女神像（沒有時從區域起點）開始
+  beginGame(save) {
+    this.save = save;
+    cfg.mpMax = MP_BASE + save.mpBonus;
+    this.loadout = SLOT_KEYS.map((_, i) => save.abilities[i] ?? null);
+    const p = this.player;
+    p.hp = cfg.hp;
+    p.mp = cfg.mpMax;
+    const i = save.room ? this.rooms.findIndex((r) => r.id === save.room) : 0;
+    this.loadRoom(Math.max(0, i), this.savePointSpot(Math.max(0, i)));
+  }
+
+  // 某個房間的女神像旁邊（重生的位置）
+  savePointSpot(index) {
+    const room = this.rooms[index];
+    for (let ty = 0; ty < room.map.length; ty++) {
+      const tx = room.map[ty].indexOf('s');
+      if (tx >= 0) return { at: { x: tx * 16 + 2, y: (ty + 1) * 16 - this.player.h } };
+    }
+    return {};
+  }
+
+  setFlag(name) {
+    if (!name || this.save.flags[name]) return;
+    this.save.flags[name] = true;
+    this.map.gateOpen = !!this.save.flags[this.room.flagGate];
+    if (this.mode === 'game') writeSave(this.save);
+  }
+
+  touchSavePoint() {
+    const p = this.player;
+    p.hp = cfg.hp;
+    p.mp = cfg.mpMax;
+    this.save.room = this.room.id ?? null;
+    if (this.mode === 'game') writeSave(this.save);
+    this.toast('女神像：已存檔，HP、MP 回滿');
+  }
+
+  openChest(chest) {
+    const id = this.room.chest;
+    this.burst(chest.cx, chest.cy, '#ffd34d', 24);
+    this.setFlag('chest:' + this.roomKey);
+    if (!id || this.save.abilities.includes(id)) return;
+    this.save.abilities.push(id);
+    const empty = this.loadout.indexOf(null);
+    if (empty >= 0) this.loadout[empty] = id;
+    if (this.mode === 'game') writeSave(this.save);
+    this.toast(`取得新能力：${SKILLS[id].name}！（按 Tab 換裝）`);
+  }
+
+  collectUpgrade(up) {
+    this.save.mpBonus += cfg.upgradeMp;
+    cfg.mpMax += cfg.upgradeMp;
+    this.player.mp = cfg.mpMax;
+    this.burst(up.cx, up.cy, '#4aa8ff', 24);
+    this.setFlag('up:' + this.roomKey);
+    this.toast(`MP 上限 +${cfg.upgradeMp}`);
+  }
+
+  pullLever(lever) {
+    this.burst(lever.cx, lever.cy, '#ffd34d', 10);
+    if (!this.room.flagGate) return;
+    this.setFlag(this.room.flagGate);
+    this.toast('捷徑打開了');
   }
 
   // 液體的總量上限：熔岩源、噴發落下的熔岩、上升的熔岩、水源都不能讓房間裡的液體超過上限，
@@ -402,6 +537,13 @@ export class World {
     if (p.hp <= 0) {
       p.hp = cfg.hp;
       p.mp = cfg.mpMax;
+      if (this.mode === 'game') {
+        // 正式遊戲：回到最後存檔的女神像；世界狀態（能力、門、捷徑）保留
+        const i = Math.max(0, this.save.room ? this.rooms.findIndex((r) => r.id === this.save.room) : 0);
+        this.toast('倒下了，回到女神像');
+        this.requestRoom(i, this.savePointSpot(i));
+        return;
+      }
       this.toast('倒下了，房間重置');
       this.resetRoom();
       return;
@@ -458,6 +600,10 @@ export class World {
     this.updateDirAim();
     this.updateCharm(dt);
     this.updatePossess(dt);
+    // 正式遊戲：記下進入房間後第一次站穩的位置
+    if (this.mode === 'game' && !this.safeSpot && this.player.grounded && this.pendingRoom === null) {
+      this.safeSpot = { x: this.player.x, y: this.player.y };
+    }
 
     if (this.pendingRoom === null) {
       this.updateGrab(dt);
@@ -496,7 +642,7 @@ export class World {
     for (const t of this.toasts) t.life -= dt;
     this.toasts = this.toasts.filter((t) => t.life > 0);
 
-    if (this.pendingRoom !== null) this.loadRoom(this.pendingRoom);
+    if (this.pendingRoom !== null) this.loadRoom(this.pendingRoom, this.pendingOpts ?? {});
   }
 
   // 物體互撞（箱子或敵人撞上敵人）：相對速度超過門檻時，被撞的一方依撞過來那一方的質量受傷；
@@ -551,6 +697,7 @@ export class World {
         ? !this.entities.some((e) => e.isEnemy && e.alive && !e.ally)
         : this.switches.length > 0 && this.switches.every((s) => s.pressed);
     if (open === this.map.doorOpen) return;
+    if (!open && this.save.flags['door:' + this.roomKey]) return; // 正式遊戲：開過的門一直保持打開
     if (!open) {
       // 有東西卡在門的位置時先不要關門
       const blocked = this.doorTiles.some(({ tx, ty }) =>
@@ -559,6 +706,7 @@ export class World {
       if (blocked) return;
     }
     this.map.doorOpen = open;
+    if (open && this.mode === 'game') this.setFlag('door:' + this.roomKey);
     this.toast(open ? '門打開了' : '門關上了');
   }
 }

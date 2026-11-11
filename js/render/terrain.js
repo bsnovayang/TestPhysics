@@ -138,6 +138,20 @@ export const TerrainRenderer = {
           ctx.fillStyle = '#ff4d5e';
           for (const bx of [4, 8, 12]) ctx.fillRect(x + bx - 1, y + 2, 1, TILE - 4);
           ctx.globalAlpha = 1;
+        } else if (c === '{') {
+          // 捷徑閘門：關著時是有橫條的金屬柵門，打開後只剩門框
+          if (map.gateOpen) {
+            ctx.strokeStyle = 'rgba(143,152,171,0.5)';
+            ctx.strokeRect(x + 0.5, y + 0.5, TILE - 1, TILE - 1);
+          } else {
+            ctx.fillStyle = '#3a4152';
+            ctx.fillRect(x, y, TILE, TILE);
+            ctx.fillStyle = '#8f98ab';
+            for (let k = 2; k < TILE; k += 5) ctx.fillRect(x + 1, y + k, TILE - 2, 2);
+            ctx.fillStyle = '#262c3a';
+            ctx.fillRect(x, y, 1, TILE);
+            ctx.fillRect(x + TILE - 1, y, 1, TILE);
+          }
         } else if (c === '^') {
           this.drawSpike(x, y, map.isSolid(tx, ty - 1) && !map.isSolid(tx, ty + 1));
         } else if (c === '|' && cfg.showHitboxes) {

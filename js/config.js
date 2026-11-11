@@ -92,6 +92,8 @@ export const cfg = {
   turbineSpinUp: 1.5,    // 渦輪被推動時每秒加速多少（轉速 0～1，到 0.5 開始發電）
   turbineSpinDown: 0.6,  // 沒有東西推時每秒減速多少
   conveyorSpeed: 60,     // 輸送帶的速度
+  edgeBoost: 430,        // 正式遊戲：從房間上緣往上換房間時，至少給這麼快的往上速度（才上得了開口旁的地板）
+  upgradeMp: 25,         // MP 上限升級一次加多少
   ropeBurnTime: 0.8,     // 繩子被燒多久會斷
   ropeSnap: 380,         // 繩子一瞬間被扯直時能承受的衝量（速度 × 質量）；超過就斷
   ropeMaxLoad: 3,        // 繩子能長時間吊住的重量（正常重力下質量 1 的倍數）；超過 ropeOverTime 秒就斷

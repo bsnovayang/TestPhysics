@@ -40,6 +40,14 @@ export class Player extends Body {
     this.groundSign = 1;
   }
 
+  // 正式遊戲：從隔壁房間走過來，保留位置（換算到新房間）與速度
+  enterAt(entry) {
+    this.x = entry.x;
+    this.y = entry.y;
+    this.vx = entry.vx;
+    this.vy = entry.vy;
+  }
+
   // 空氣砲與網的發射點（肩膀），會隨重力方向翻轉
   shoulder() {
     const up = this.groundAxis === 'y' ? -this.groundSign : -1;
@@ -222,7 +230,9 @@ export class Player extends Body {
   }
 
   checkHazards(world) {
-    if (this.x > VIEW_W) {
+    if (world.mode === 'game') {
+      if (world.tryEdgeExit()) return;
+    } else if (this.x > VIEW_W) {
       world.requestRoom(world.roomIndex + 1);
       return;
     }

@@ -3,99 +3,22 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>TestPhysics 原型</title>
-  <style>
-    /* 像素字型：Fusion Pixel 12px（OFL 授權，見 fonts/OFL-fusion-pixel.txt） */
-    @font-face { font-family: "FusionPixel"; src: url("fonts/fusion-pixel-12px-proportional-zh_tw.ttf.woff2") format("woff2"); font-display: block; }
-    :root {
-      --bg: #0d0f14;
-      --panel: rgba(16, 19, 27, 0.94);
-      --text: #e8edf5;
-      --dim: #8a93a6;
-      --accent: #4aa8ff;
-    }
-    * { box-sizing: border-box; }
-    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
-      font-family: "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif; overflow: hidden; }
-    #wrap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
-    #game { display: block; cursor: none; image-rendering: pixelated; }
-    .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
-      background: rgba(5, 6, 10, 0.6); z-index: 10; }
-    .overlay[hidden] { display: none; }
-    .panel { background: var(--panel); border: 1px solid #2a3142; border-radius: 8px;
-      padding: 20px 24px; max-width: 640px; width: calc(100% - 32px); max-height: calc(100% - 32px); overflow: auto; }
-    h1 { margin: 0 0 8px; font-size: 22px; }
-    h2 { margin: 16px 0 8px; font-size: 15px; color: var(--accent); }
-    p { margin: 6px 0; color: var(--dim); line-height: 1.6; }
-    table { border-collapse: collapse; width: 100%; font-size: 13px; }
-    td { padding: 3px 6px; border-bottom: 1px solid #222838; }
-    td:first-child { color: var(--accent); white-space: nowrap; width: 1%; }
-    #start { cursor: pointer; }
-    #start .panel { text-align: center; }
-    .big { font-size: 16px; color: var(--text); margin-top: 16px; }
-    #help { background: transparent; pointer-events: none; justify-content: flex-start; align-items: flex-start; }
-    #help .panel { pointer-events: auto; margin: 16px; max-width: 420px; }
-    .cast { margin-top: 4px; text-align: left; }
-    .panel.wide { max-width: 960px; }
-    #start .panel { max-width: 960px; }
-    /* 選關：一排 10 個，滿了自動換行 */
-    .levels { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 6px; margin: 6px 0; }
-    .levels button { font: inherit; color: var(--text); background: #1c2230; border: 1px solid #2a3142; border-radius: 4px;
-      padding: 6px 2px; cursor: pointer; min-width: 0; }
-    .levels button b { display: block; font-size: 16px; color: var(--accent); }
-    .levels button small { display: block; font-size: 11px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .levels button:hover { background: #252d3f; }
-    .levels button.current { border-color: var(--accent); }
-    @media (max-width: 640px) { .levels { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
-    .versions a { display: inline-block; margin: 0 6px; padding: 4px 10px; border: 1px solid #2a3142; border-radius: 4px; color: var(--text); text-decoration: none; }
-    .versions a:hover { background: #252d3f; }
-    .versions a.current { border-color: var(--accent); color: var(--accent); }
-    td b { color: #ffd34d; font-weight: normal; }
-    .grid { display: flex; flex-wrap: wrap; gap: 6px; }
-    .grid button { font: inherit; color: var(--text); background: #1c2230; border: 1px solid #2a3142;
-      border-left: 4px solid #555; border-radius: 4px; padding: 6px 10px; min-width: 96px; text-align: left; cursor: pointer; }
-    .grid button small { display: block; color: var(--dim); font-size: 11px; }
-    .grid button:hover { background: #252d3f; }
-    .grid button.selected { outline: 2px solid var(--accent); }
-  </style>
+  <title>TestPhysics</title>
+  <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
+<body data-mode="game">
   <div id="wrap"><canvas id="game"></canvas></div>
 
   <div id="start" class="overlay">
     <div class="panel">
-      <h1>TestPhysics 原型</h1>
+      <h1>TestPhysics</h1>
       <p>發射「網」展開物理場域，改寫區域內的重力與時間。</p>
-      <table class="cast">
-        <tr><td>A / D、Space</td><td>移動、跳躍</td></tr>
-        <tr><td>滑鼠左鍵</td><td>空氣砲（按住再放開：蓄力砲）</td></tr>
-        <tr><td>右鍵、Q E R F</td><td>施放技能（對準游標）</td></tr>
-      </table>
-      <h2>技能的三種施放方式</h2>
-      <table class="cast">
-        <tr><td>游標指向空地或牆</td><td><b>按一下</b>：場域固定在那裡，3 秒後消失</td></tr>
-        <tr><td>游標指向箱子、敵人</td><td><b>按一下</b>：場域附著在對方身上，跟著移動</td></tr>
-        <tr><td>游標指向自己<br>（或按住 C）</td><td><b>長按</b>：場域附著在自己身上，持續消耗 MP，放開就結束</td></tr>
-        <tr><td>定向重力</td><td><b>按住</b>：網飛到游標的位置當起點，<b>移動游標決定方向</b>，放開確定</td></tr>
-      </table>
-      <table class="cast">
-        <tr><td>重力抓取</td><td>游標指著<b>身邊</b>的物體<b>按住</b>：拿在面前（游標決定方向），放開時保留速度。升級後可以隔空抓遠處的東西</td></tr>
-        <tr><td>時間倒轉</td><td>打中物體：它沿著過去 8 秒的路徑倒退回去，可以站在上面被載回去</td></tr>
-        <tr><td>磁力</td><td>只吸引金屬（鐵塊、重裝兵）</td></tr>
-        <tr><td>反射場</td><td>場域的邊界會反彈：外面的東西進不來、裡面的出不去（子彈、雷射、箱子、敵人、水）；附著在自己身上，子彈會原路彈回</td></tr>
-        <tr><td>加熱／冷卻</td><td>範圍內加熱或冷卻：煮水成蒸氣、融冰；水面結冰、熔岩變成石頭、敵人凍僵</td></tr>
-        <tr><td>風場</td><td><b>按住</b>拖曳游標決定風向：越輕的東西越容易被吹（木箱會動、鐵塊不動），牆後面是避風處；也會吹動蒸氣和子彈</td></tr>
-        <tr><td>連動裝置</td><td>渦輪被蒸氣或風推動時發電；通電的輸送帶會把上面的東西送走；繩子被加熱或熔岩燒斷，吊著的東西會掉下來；扯太猛、吊太重也會斷；彈性繩和彈床會回彈，被冷卻時變硬（加熱才恢復）；在彈床上按跳會越彈越高</td></tr>
-        <tr><td>通電場</td><td>範圍內的導體通電，電沿著相連的水、金屬、鐵塊傳開；冰、木箱、石頭不導電。黑色的包覆導線很安全；裸露金屬、黃黑條紋的接頭、帶電的水碰到會被電（自己也會），頭上冒火花就是危險</td></tr>
-        <tr><td>電磁加速</td><td>把身邊的鐵塊朝游標方向高速射出（冷卻 2 秒）</td></tr>
-      </table>
-      <p>時停附著在物體上時只凍結它本身；它挨的空氣砲和撞擊，力量會累積起來（藍色箭頭），時停結束時一次釋放。</p>
-      <p>遊戲中按 H 可以隨時查看說明。</p>
-      <h2>選擇關卡</h2>
-      <div id="levels-start" class="levels"></div>
-      <h2>水的版本（比較用）</h2>
-      <p id="versions" class="versions"></p>
-      <p class="big">點擊開始</p>
+      <p>目前內容：重力區的垂直切片（8 個房間）</p>
+      <div class="menu">
+        <button id="btn-continue" hidden>繼續</button>
+        <button id="btn-new">新遊戲</button>
+      </div>
+      <p>測試機制用的房間在 <a href="lab.html">實驗室</a>。</p>
     </div>
   </div>
 
@@ -106,54 +29,37 @@
         <tr><td>A / D</td><td>移動（重力朝側面時改用 W / S）</td></tr>
         <tr><td>Space</td><td>跳躍</td></tr>
         <tr><td>Shift</td><td>衝刺（空中一次）</td></tr>
-        <tr><td>左鍵</td><td>空氣砲（按一下射一發，有後座力）：<b>只有擊退、沒有傷害</b>；<b>按住 0.8 秒再放開：蓄力砲</b>，擊退力 4 倍，可以把敵人射去撞牆、把箱子和鐵塊射去撞敵人和魔王</td></tr>
+        <tr><td>左鍵</td><td>空氣砲：<b>只有擊退、沒有傷害</b>；<b>按住 0.8 秒再放開：蓄力砲</b>，擊退力 4 倍</td></tr>
+        <tr><td>右鍵、Q E R F</td><td>施放技能（對準游標）</td></tr>
         <tr><td>X／中鍵</td><td>解除所有場域</td></tr>
-        <tr><td>Tab</td><td>裝備選單（暫停）</td></tr>
+        <tr><td>Tab</td><td>裝備：換技能（遊戲暫停）</td></tr>
+        <tr><td>T</td><td>重置房間（卡住時用）</td></tr>
         <tr><td>Esc</td><td>暫停</td></tr>
-        <tr><td>L</td><td>選擇關卡</td></tr>
-        <tr><td>/</td><td>顯示／隱藏房間提示（預設隱藏）</td></tr>
       </table>
-      <h2>施放技能（右鍵、Q E R F）</h2>
+      <h2>施放技能</h2>
       <table>
         <tr><td>指向空地或牆</td><td><b>按一下</b>：固定場域，3 秒後消失</td></tr>
         <tr><td>指向箱子、敵人</td><td><b>按一下</b>：附著在對方身上</td></tr>
         <tr><td>指向自己／按住 C</td><td><b>長按</b>：附著在自己身上，每秒消耗 MP，放開就結束</td></tr>
-        <tr><td>定向重力</td><td><b>按住</b>：網飛到游標處當起點，移動游標決定方向，放開確定</td></tr>
       </table>
-      <table>
-        <tr><td>重力抓取</td><td><b>按住</b>：抓起身邊的物體拿在面前（升級後可以隔空抓），放開時保留速度</td></tr>
-        <tr><td>時間倒轉</td><td>打中物體：沿過去 8 秒的路徑倒退，可以站上去被載回去</td></tr>
-        <tr><td>磁力</td><td>只吸引金屬（鐵塊、重裝兵）</td></tr>
-        <tr><td>反射場</td><td>邊界會反彈：外面的進不來、裡面的出不去；附著在自己身上，子彈原路彈回</td></tr>
-        <tr><td>加熱／冷卻</td><td>煮水、融冰；結冰、熔岩變石頭、敵人凍僵</td></tr>
-        <tr><td>風場</td><td>按住拖曳決定風向；輕的東西被吹動，牆後面是避風處</td></tr>
-        <tr><td>通電場</td><td>電沿著水、金屬、鐵塊傳開；冰不導電；泡在通電的水裡會被電</td></tr>
-        <tr><td>電磁加速</td><td>把身邊的鐵塊朝游標方向高速射出</td></tr>
-      </table>
-      <p>站著完全不動幾秒，MP 會回得很快（附近有敵人時要等比較久）。</p>
-      <p>附著的時停只凍結目標本身；它挨的空氣砲和撞擊會累積力量（藍色箭頭），時停結束時一次釋放。</p>
-      <p>游標旁會顯示目前的施放方式。場上最多 2 個固定場域，再放會取代最舊的；附著自己的場域不算在內。</p>
-      <h2>除錯</h2>
-      <table>
-        <tr><td>1～9、0、-、=、\、;、'、,、.、`、Y、U、O、P</td><td>把技能直接放到右鍵（0 閃現、- 傳送門、= 重力抓取、\ 磁力、; 時間倒轉、' 反射場、, 電磁加速、. 洗腦（暫緩）、` 附身（暫緩）、Y 加熱、U 冷卻、O 風場、P 通電場）</td></tr>
-        <tr><td>[ / ]</td><td>上一個／下一個房間</td></tr>
-        <tr><td>T</td><td>重置房間</td></tr>
-        <tr><td>G</td><td>顯示碰撞框與數值</td></tr>
-        <tr><td>M</td><td>整體慢動作</td></tr>
-        <tr><td>H</td><td>開關這個說明</td></tr>
-        <tr><td>F2</td><td>開關除錯參數面板（即時調整數值）</td></tr>
-        <tr><td>按住 B／N</td><td>在游標位置噴蒸氣／倒水</td></tr>
-        <tr><td>K</td><td>對游標下的敵人造成 3 點傷害（無視護甲）</td></tr>
-        <tr><td>J</td><td>魔王直接進入第二階段</td></tr>
-        <tr><td>I</td><td>玩家無敵（尖刺、掉落仍會回到入口）</td></tr>
-      </table>
+      <p>站著完全不動幾秒，MP 會回得很快。碰到女神像會存檔，HP、MP 回滿；倒下時回到最後碰過的女神像。</p>
+      <div id="help-debug" hidden>
+        <h2>除錯（網址加 ?debug）</h2>
+        <table>
+          <tr><td>L</td><td>傳送到任一房間</td></tr>
+          <tr><td>F8</td><td>拿到這個區域的所有能力</td></tr>
+          <tr><td>F9</td><td>清除存檔並重新開始</td></tr>
+          <tr><td>1～0 等</td><td>把技能直接放到右鍵（同實驗室）</td></tr>
+          <tr><td>G、I、M、F2</td><td>碰撞框、無敵、慢動作、參數面板</td></tr>
+        </table>
+      </div>
     </div>
   </div>
 
   <div id="levels" class="overlay" hidden>
     <div class="panel wide">
-      <h1>選擇關卡</h1>
-      <p>點選要進入的關卡。L 或 Esc 關閉。</p>
+      <h1>傳送</h1>
+      <p>點選要去的房間。L 或 Esc 關閉。</p>
       <div id="levels-menu" class="levels"></div>
     </div>
   </div>
@@ -164,7 +70,7 @@
       <p>先點選技能欄，再點選要放進去的技能。Tab 或 Esc 關閉。</p>
       <h2>技能欄</h2>
       <div id="loadout-slots" class="grid"></div>
-      <h2>已解鎖的技能</h2>
+      <h2>已取得的能力</h2>
       <div id="loadout-skills" class="grid"></div>
     </div>
   </div>

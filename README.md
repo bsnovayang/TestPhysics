@@ -11,7 +11,14 @@ ES Modules 必須透過 HTTP 載入，不能直接雙擊 `index.html`。
 - **XAMPP**：把專案放在 `htdocs/TestPhysics`，啟動 Apache，開啟 `http://localhost/TestPhysics/`
 - **其他方式**：在專案資料夾執行任何靜態伺服器，例如 `npx serve` 或 `python -m http.server`
 
-開發用網址參數：`?autostart` 跳過開始畫面，`?room=N` 直接進入第 N 個房間。
+兩個頁面，共用同一套程式（物理、能力、物件、繪圖）：
+
+| 頁面 | 內容 |
+|---|---|
+| `index.html`：正式遊戲 | 重力區的垂直切片（8 個房間）。房間有世界座標，走出畫面邊緣就到隔壁房間；有存檔、小地圖；沒有房間提示 |
+| `lab.html`：實驗室 | 所有測試房間，各自獨立，每間指定能力；新機制先在這裡驗證 |
+
+開發用網址參數：`?autostart` 跳過開始畫面（正式遊戲會繼續存檔），`?room=N` 直接進入第 N 個房間。正式遊戲要加 `?debug` 才有除錯按鍵（L 傳送、F8 拿到所有能力、F9 清除存檔）。
 
 ## 水的四種版本（比較用）
 
@@ -19,10 +26,10 @@ ES Modules 必須透過 HTTP 載入，不能直接雙擊 `index.html`。
 
 | 版本 | 網址 | 說明 |
 |---|---|---|
-| 原版（格子水） | `index.html?water=cell` | 每一格存一個水量，流動可預測 |
-| 粒子版 | `index.html?water=particle` 或 `experiments/particle-water/` | 用粒子模擬水流，再換算回格子，其他系統直接沿用 |
-| 原版＋粒子特效 | `index.html?water=fx` 或 `experiments/water-fx/` | 運作和原版相同，畫面加上水珠、水花、水面波紋 |
-| **Noita 風像素水（正式）** | `index.html` 或 `experiments/pixel-water/` | 落沙模擬：每 2×2 px 一格，水、蒸氣、熔岩都是像素；亂數固定種子，同樣的操作結果相同 |
+| 原版（格子水） | `lab.html?water=cell` | 每一格存一個水量，流動可預測 |
+| 粒子版 | `lab.html?water=particle` 或 `experiments/particle-water/` | 用粒子模擬水流，再換算回格子，其他系統直接沿用 |
+| 原版＋粒子特效 | `lab.html?water=fx` 或 `experiments/water-fx/` | 運作和原版相同，畫面加上水珠、水花、水面波紋 |
+| **Noita 風像素水（正式）** | `lab.html` 或 `experiments/pixel-water/` | 落沙模擬：每 2×2 px 一格，水、蒸氣、熔岩都是像素；亂數固定種子，同樣的操作結果相同 |
 
 建議在房間 G（冰與水）和 H（蒸氣）比較，也可以按住 N 倒水、B 噴蒸氣。
 
